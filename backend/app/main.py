@@ -14,20 +14,32 @@ from app.core.security_validator import validate_production_config
 async def lifespan(app: FastAPI):
     logger.info("Starting up application...")
     
-    # Validate critical security configuration
-    validate_production_config()
-    
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    await init_redis()
-    logger.info("Application started successfully")
+    try:
+        # Validate critical security configuration
+        validate_production_config()
+        
+        # Initialize database
+        logger.info("Connecting to database...")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database initialized successfully")
+        
+        # Initialize Redis (optional)
+        await init_redis()
+        
+        logger.info("Application started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start application: {e}")
+        raise
     
     yield
     
     logger.info("Shutting down application...")
-    await close_redis()
-    await engine.dispose()
+    try:
+        await close_redis()
+        await engine.dispose()
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
     logger.info("Application shut down successfully")
 
 

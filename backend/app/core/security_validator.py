@@ -48,6 +48,11 @@ def validate_production_config():
     """
     Validates critical production configuration.
     """
+    # Only validate in production environment
+    if settings.ENVIRONMENT != "production":
+        logger.info("Skipping production validation in non-production environment")
+        return
+    
     validate_secret_key()
     
     # Validate Mercado Pago webhook secret exists
