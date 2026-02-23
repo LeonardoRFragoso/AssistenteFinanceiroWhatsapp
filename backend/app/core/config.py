@@ -4,23 +4,23 @@ from typing import Optional
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    REDIS_URL: str
+    REDIS_URL: Optional[str] = None
     
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    TWILIO_ACCOUNT_SID: str
-    TWILIO_AUTH_TOKEN: str
-    TWILIO_WHATSAPP_NUMBER: str
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_WHATSAPP_NUMBER: Optional[str] = None
     
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o"
     
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     
-    MERCADO_PAGO_ACCESS_TOKEN: str
+    MERCADO_PAGO_ACCESS_TOKEN: Optional[str] = None
     MERCADO_PAGO_PUBLIC_KEY: Optional[str] = None
     MERCADO_PAGO_WEBHOOK_SECRET: Optional[str] = None
     

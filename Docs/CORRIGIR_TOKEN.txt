@@ -1,0 +1,20 @@
+CORREÇÃO DO AUTH TOKEN
+
+Token INCORRETO (atual no .env):
+REDACTED_TWILIO_AUTH_TOKEN
+                   ^
+                   3 (errado)
+
+Token CORRETO (da imagem do console):
+REDACTED_TWILIO_AUTH_TOKEN
+                   ^
+                   5 (correto)
+
+AÇÃO:
+1. Abra o arquivo .env
+2. Localize a linha: TWILIO_AUTH_TOKEN=REDACTED_TWILIO_AUTH_TOKEN
+3. Substitua por: TWILIO_AUTH_TOKEN=REDACTED_TWILIO_AUTH_TOKEN
+4. Salve o arquivo
+5. Execute: docker-compose restart backend
+6. Aguarde 10 segundos
+7. Execute: .\test-whatsapp.ps1
