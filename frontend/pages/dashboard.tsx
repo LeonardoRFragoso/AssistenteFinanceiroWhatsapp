@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
+import WhatsAppConnect from '../components/WhatsAppConnect';
 import { reportsAPI, billingAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
@@ -354,23 +355,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* WhatsApp tip - Modern card */}
-        <div className="relative bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 rounded-2xl shadow-lg p-6 border border-blue-200 dark:border-blue-800 overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/10 rounded-full -mr-16 -mt-16"></div>
-          <div className="relative flex items-start gap-4">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-bold bg-gradient-to-r from-blue-700 to-indigo-700 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent mb-2">
-                💬 Use o WhatsApp!
-              </h3>
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                Envie mensagens como <span className="font-semibold text-blue-600 dark:text-blue-400">"Gastei R$ 50 com almoço"</span> ou <span className="font-semibold text-indigo-600 dark:text-indigo-400">"Quanto gastei esse mês?"</span> para registrar e consultar suas finanças rapidamente.
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* WhatsApp Connection */}
+        <WhatsAppConnect />
       </div>
     </Layout>
   );
