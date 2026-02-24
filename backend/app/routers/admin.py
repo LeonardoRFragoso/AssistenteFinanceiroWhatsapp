@@ -21,6 +21,7 @@ from app.models.transaction import Transaction, TransactionType
 from app.models.payment_event import PaymentEvent
 from app.core.logging import logger
 from app.utils.dependencies import get_current_admin_user
+import re
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -307,4 +308,59 @@ async def get_admin_dashboard(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving dashboard metrics"
+        )
+
+
+@router.post("/fix-phone-numbers")
+async def fix_phone_numbers(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Normaliza todos os números de telefone para formato Twilio (+5521XXXXXXXXX)"""
+    try:
+        result = await db.execute(select(User))
+        users = result.scalars().all()
+        
+        updated_count = 0
+        updates = []
+        
+        for user in users:
+            original_phone = user.phone_number
+            # Remove caracteres não numéricos exceto +
+            cleaned = re.sub(r'[^\d+]', '', original_phone)
+            
+            # Se não tem +, assume Brasil e adiciona +55
+            if not cleaned.startswith('+'):
+                if cleaned.startswith('0'):
+                    cleaned = cleaned[1:]
+                cleaned = f'+55{cleaned}'
+            
+            if original_phone != cleaned:
+                logger.info(f"Updating user {user.id} ({user.email}): {original_phone} -> {cleaned}")
+                user.phone_number = cleaned
+                updated_count += 1
+                updates.append({
+                    "user_id": user.id,
+                    "email": user.email,
+                    "old_phone": original_phone,
+                    "new_phone": cleaned
+                })
+        
+        if updated_count > 0:
+            await db.commit()
+            logger.info(f"Successfully updated {updated_count} phone numbers")
+        
+        return {
+            "success": True,
+            "updated_count": updated_count,
+            "total_users": len(users),
+            "updates": updates
+        }
+        
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error fixing phone numbers: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fixing phone numbers: {str(e)}"
         )
