@@ -13,10 +13,22 @@ class UserCreate(BaseModel):
     @field_validator('phone_number')
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        phone_pattern = re.compile(r'^\+?[1-9]\d{1,14}$')
-        if not phone_pattern.match(v.replace(' ', '').replace('-', '')):
-            raise ValueError('Invalid phone number format')
-        return v.replace(' ', '').replace('-', '')
+        # Remove caracteres não numéricos exceto +
+        cleaned = re.sub(r'[^\d+]', '', v)
+        
+        # Se não tem +, assume Brasil e adiciona +55
+        if not cleaned.startswith('+'):
+            # Remove zero inicial do DDD se existir
+            if cleaned.startswith('0'):
+                cleaned = cleaned[1:]
+            cleaned = f'+55{cleaned}'
+        
+        # Valida formato internacional
+        phone_pattern = re.compile(r'^\+[1-9]\d{10,14}$')
+        if not phone_pattern.match(cleaned):
+            raise ValueError('Invalid phone number format. Use format: (XX) XXXXX-XXXX or +55XXXXXXXXXXX')
+        
+        return cleaned
 
 
 class UserLogin(BaseModel):
