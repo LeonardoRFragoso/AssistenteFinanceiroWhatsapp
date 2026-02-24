@@ -49,3 +49,18 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
     return current_user
+
+
+@router.get("/me/is-admin")
+async def check_admin_status(
+    current_user: User = Depends(get_current_user)
+):
+    """Check if current user has admin privileges"""
+    from app.core.config import settings
+    
+    admin_emails = getattr(settings, 'ADMIN_EMAILS', '').split(',')
+    admin_emails = [email.strip() for email in admin_emails if email.strip()]
+    
+    is_admin = current_user.email in admin_emails
+    
+    return {"is_admin": is_admin}

@@ -21,6 +21,7 @@ const navItems = [
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function Layout({ children }: LayoutProps) {
       return;
     }
     loadUser();
+    checkAdminStatus();
   }, []);
 
   const loadUser = async () => {
@@ -38,6 +40,15 @@ export default function Layout({ children }: LayoutProps) {
       setUser(res.data);
     } catch {
       setUser(null);
+    }
+  };
+
+  const checkAdminStatus = async () => {
+    try {
+      const res = await authAPI.checkAdminStatus();
+      setIsAdmin(res.data.is_admin);
+    } catch {
+      setIsAdmin(false);
     }
   };
 
@@ -81,6 +92,11 @@ export default function Layout({ children }: LayoutProps) {
 
         <nav className="mt-6 px-3 space-y-1">
           {navItems.map((item) => {
+            // Hide admin route if user is not admin
+            if (item.href === '/admin' && !isAdmin) {
+              return null;
+            }
+            
             const isActive = router.pathname === item.href;
             const Icon = item.icon;
             return (

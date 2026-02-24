@@ -37,6 +37,7 @@ export const authAPI = {
   login: (data: { email: string; password: string }) =>
     api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
+  checkAdminStatus: () => api.get('/auth/me/is-admin'),
 };
 
 export const transactionsAPI = {
