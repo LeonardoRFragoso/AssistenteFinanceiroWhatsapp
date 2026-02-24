@@ -102,14 +102,17 @@ async def whatsapp_webhook(
         
         if not user:
             response_message = (
-                "Ola! Bem-vindo ao Assistente Financeiro!\n\n"
-                "Para comecar a usar, voce precisa se cadastrar no nosso site.\n\n"
-                "Apos o cadastro, voce podera:\n"
-                "- Registrar despesas e receitas\n"
-                "- Ver relatorios financeiros\n"
-                "- Criar lembretes\n"
-                "- Conversar comigo via WhatsApp\n\n"
-                f"Acesse: {settings.FRONTEND_URL}"
+                "👋 Olá! Seja bem-vindo(a) ao *Assistente Financeiro*!\n\n"
+                "Vejo que você ainda não tem cadastro. Não se preocupe, é rápido e fácil!\n\n"
+                "✨ *Com o Assistente Financeiro você pode:*\n"
+                "💰 Registrar despesas e receitas por voz ou texto\n"
+                "📊 Ver relatórios e gráficos detalhados\n"
+                "🔔 Criar lembretes de pagamentos\n"
+                "🤖 Conversar comigo aqui no WhatsApp 24/7\n"
+                "📈 Acompanhar seu saldo em tempo real\n\n"
+                "🚀 *Comece agora:*\n"
+                f"{settings.FRONTEND_URL}/register\n\n"
+                "Após o cadastro, é só me enviar uma mensagem e começamos! 😊"
             )
             
             await twilio_service.send_message(From, response_message)
@@ -120,9 +123,15 @@ async def whatsapp_webhook(
         
         if not subscription or subscription.status != "active":
             response_message = (
-                "Sua assinatura esta inativa.\n\n"
-                "Para continuar usando o assistente, ative sua assinatura:\n"
-                f"Acesse: {settings.FRONTEND_URL}/plans"
+                "⚠️ Olá! Sua assinatura está inativa no momento.\n\n"
+                "💡 *Para continuar aproveitando todos os recursos:*\n"
+                "📱 Registro de transações ilimitadas\n"
+                "📊 Relatórios detalhados\n"
+                "🔔 Lembretes automáticos\n"
+                "🤖 Assistente IA 24/7\n\n"
+                "🎯 *Ative sua assinatura agora:*\n"
+                f"{settings.FRONTEND_URL}/plans\n\n"
+                "Escolha o plano ideal para você e volte a ter o controle total das suas finanças! 💪"
             )
             await twilio_service.send_message(From, response_message)
             return {"status": "success", "message": "Subscription inactive"}
