@@ -55,6 +55,7 @@ async def whatsapp_webhook(
     
     try:
         phone_number = twilio_service.extract_phone_number(From)
+        logger.info(f"📞 Extracted phone number: {phone_number}")
         
         await whatsapp_rate_limiter.check_rate_limit(phone_number)
         
@@ -99,6 +100,7 @@ async def whatsapp_webhook(
         
         user_repo = UserRepository(db)
         user = await user_repo.get_by_phone(phone_number)
+        logger.info(f"👤 User lookup for {phone_number}: {'Found' if user else 'Not found'}")
         
         if not user:
             response_message = (

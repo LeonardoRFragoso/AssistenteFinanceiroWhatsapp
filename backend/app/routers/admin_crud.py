@@ -383,6 +383,48 @@ async def delete_reminder(
         )
 
 
+@router.patch("/users/{user_id}/phone")
+async def update_user_phone(
+    user_id: int,
+    phone_number: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Update user phone number"""
+    try:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        old_phone = user.phone_number
+        user.phone_number = phone_number
+        
+        await db.commit()
+        await db.refresh(user)
+        
+        logger.info(f"Updated phone for user {user_id}: {old_phone} -> {phone_number}")
+        
+        return {
+            "message": "Phone number updated successfully",
+            "user_id": user.id,
+            "email": user.email,
+            "old_phone": old_phone,
+            "new_phone": user.phone_number
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error updating user phone: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error updating phone number"
+        )
+
+
 # ============= STATISTICS =============
 
 @router.get("/stats/overview")
