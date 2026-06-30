@@ -1,4 +1,4 @@
-# 💰 Assistente Financeiro via WhatsApp - SaaS
+# 💰 Payflow-AI - SaaS
 
 Sistema completo de gestão financeira pessoal via WhatsApp com dashboard web, utilizando inteligência artificial para processamento de linguagem natural.
 
