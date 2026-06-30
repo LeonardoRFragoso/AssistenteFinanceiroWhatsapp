@@ -26,9 +26,21 @@ INTENTS POSSÍVEIS:
 - create_reminder: Usuário quer criar um lembrete/compromisso
 - financial_report: Usuário quer ver relatórios, saldo, resumo financeiro
 - list_transactions: Usuário quer ver lista de transações
+- create_pix_charge: Usuário quer criar uma cobrança/pix/link de pagamento para outra pessoa
+- confirm_pending_action: Usuário confirma uma ação pendente (ex: "confirmo", "sim", "pode gerar", "pode criar")
+- cancel_pending_action: Usuário cancela uma ação pendente (ex: "cancela", "não", "deixa pra lá", "desiste")
+- list_charges: Usuário quer listar cobranças criadas
+- check_charge_status: Usuário quer saber se uma cobrança específica foi paga
 - help: Usuário precisa de ajuda ou não entendeu
 
 EXTRAÇÃO DE ENTIDADES:
+Para cobranças (create_pix_charge), extraia:
+- amount (valor numérico, obrigatório)
+- customer_name (nome do cliente devedor, obrigatório)
+- customer_phone (telefone do cliente, se informado)
+- description (descrição do serviço/produto, se informado)
+- due_date (data de vencimento no formato YYYY-MM-DD, se informado; se não informado, deixe null)
+
 Para despesas/receitas, extraia:
 - amount (valor numérico)
 - category (categoria como: alimentação, transporte, saúde, lazer, salário, freelance, etc)
@@ -102,10 +114,57 @@ Classifique a intenção e extraia as entidades."""
                 "response_suggestion": "Desculpe, não entendi. Pode reformular?"
             }
     
+    def detect_confirmation(self, message: str) -> Optional[str]:
+        """Local, fast-path detection for confirmation/cancellation messages."""
+        text = message.lower().strip()
+        confirmation_words = ["confirmo", "confirma", "sim", "pode gerar", "pode criar", "gera", "cria", "fechar", "fecha"]
+        cancellation_words = ["cancela", "cancelar", "não", "nao", "deixa pra lá", "deixa para la", "desiste", "não quero", "nao quero"]
+
+        for word in cancellation_words:
+            if word in text:
+                return "cancel_pending_action"
+        for word in confirmation_words:
+            if word in text:
+                return "confirm_pending_action"
+        return None
+
+    def extract_charge_entities(self, message: str) -> Dict[str, Any]:
+        """Fallback local extraction for charge entities."""
+        entities = {}
+        amount = self._extract_amount(message)
+        if amount:
+            entities["amount"] = amount
+
+        # Simple customer name extraction: look for "para" / "pra" / "do" / "da"
+        # followed by a capitalized name. This is intentionally heuristic.
+        name_match = re.search(r'(?:para|pra|pro|do|da)\s+([A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]+)?)', message)
+        if name_match:
+            entities["customer_name"] = name_match.group(1).strip()
+
+        # Description: common patterns after "referente", "de" or "por"
+        # Avoid capturing just a numeric value (e.g., "R$ 150").
+        desc_match = re.search(
+            r'(?:referente|referente a|referente ao|de|do|da|por)\s+((?:(?!\bR\$\b|\d{1,3}(?:\.\d{3})*,\d{2})\S+\s?)+?)(?:\s+(?:para|pra|pro|vencimento|vence|até|ate|cliente)\s+|$)',
+            message,
+            re.IGNORECASE
+        )
+        if desc_match:
+            entities["description"] = desc_match.group(1).strip()[:1000]
+
+        phone_match = re.search(r'(?:\+?55\s?)?\(?\d{2}\)?\s?\d{4,5}-?\d{4}', message)
+        if phone_match:
+            phone = phone_match.group(0).strip()
+            phone = re.sub(r'[\(\)\s\-]', '', phone)
+            if phone.startswith('55'):
+                phone = phone[2:]
+            entities["customer_phone"] = phone
+
+        return entities
+
     async def generate_response(
-        self, 
-        intent: str, 
-        entities: Dict[str, Any], 
+        self,
+        intent: str,
+        entities: Dict[str, Any],
         context: str = "",
         additional_data: Optional[Dict[str, Any]] = None
     ) -> str:

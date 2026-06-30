@@ -102,21 +102,21 @@ async def mercado_pago_webhook(
         
         from app.integrations.mercado_pago import MercadoPagoService
         mp_service = MercadoPagoService()
-        
-        raw_body = await request.body()
-        is_valid = mp_service.validate_webhook_signature(
-            raw_body.decode('utf-8'),
-            x_signature,
-            x_request_id
+
+        url = str(request.url)
+        is_valid = mp_service.validate_webhook_signature_from_url(
+            url=url,
+            x_signature=x_signature,
+            x_request_id=x_request_id
         )
-        
+
         if not is_valid:
             logger.warning(f"Invalid webhook signature from Mercado Pago - rejecting")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid webhook signature"
             )
-        
+
         from app.utils.log_sanitizer import sanitize_webhook_data
         logger.info(f"Received valid Mercado Pago webhook: {sanitize_webhook_data(body)}")
         

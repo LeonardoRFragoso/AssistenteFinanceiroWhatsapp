@@ -4,6 +4,9 @@ from app.schemas.reminder import ReminderCreate, ReminderResponse, ReminderUpdat
 from app.schemas.subscription import SubscriptionCreate, SubscriptionResponse
 from app.schemas.conversation import ConversationLogCreate, ConversationLogResponse
 from app.schemas.whatsapp import WhatsAppMessage, WhatsAppResponse
+from app.schemas.charge import ChargeCreate, ChargeResponse, ChargeListResponse
+from app.schemas.pending_action import PendingActionCreate, PendingActionResponse
+from app.schemas.provider_event import ProviderEventCreate, ProviderEventResponse
 
 __all__ = [
     "UserCreate", "UserResponse", "UserLogin", "Token",
@@ -11,5 +14,8 @@ __all__ = [
     "ReminderCreate", "ReminderResponse", "ReminderUpdate",
     "SubscriptionCreate", "SubscriptionResponse",
     "ConversationLogCreate", "ConversationLogResponse",
-    "WhatsAppMessage", "WhatsAppResponse"
+    "WhatsAppMessage", "WhatsAppResponse",
+    "ChargeCreate", "ChargeResponse", "ChargeListResponse",
+    "PendingActionCreate", "PendingActionResponse",
+    "ProviderEventCreate", "ProviderEventResponse"
 ]

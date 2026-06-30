@@ -1,6 +1,6 @@
-# 💰 Assistente Financeiro via WhatsApp - SaaS
+# 💰 PayFlow AI - Assistente Financeiro Transacional via WhatsApp
 
-Sistema completo de gestão financeira pessoal via WhatsApp com dashboard web, utilizando inteligência artificial para processamento de linguagem natural.
+Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. Utiliza inteligência artificial para processamento de linguagem natural, permitindo registrar despesas, receitas e criar cobranças com links de pagamento de forma segura.
 
 ## � Como Testar o WhatsApp
 
@@ -14,6 +14,7 @@ Sistema completo de gestão financeira pessoal via WhatsApp com dashboard web, u
    - "Gastei R$ 50 com almoço"
    - "Qual meu saldo?"
    - "Mostre minhas transações"
+   - "Gere uma cobrança de R$ 150 para João referente ao serviço do site"
 
 > **Nota**: Este é o número do Twilio WhatsApp Sandbox para desenvolvimento. Em produção, você terá seu próprio número aprovado.
 
@@ -48,6 +49,9 @@ Sistema completo de gestão financeira pessoal via WhatsApp com dashboard web, u
 - ✅ Criação de lembretes/compromissos
 - ✅ Consulta de saldo e relatórios
 - ✅ Listagem de transações recentes
+- ✅ Criação de cobranças com confirmação explícita do usuário
+- ✅ Listagem e consulta de status de cobranças
+- ✅ Notificação automática quando um pagamento é confirmado
 - ✅ IA que entende português informal
 
 ### Dashboard Web
@@ -57,6 +61,7 @@ Sistema completo de gestão financeira pessoal via WhatsApp com dashboard web, u
 - ✅ Lista de transações recentes
 - ✅ Gerenciamento de lembretes
 - ✅ Relatórios mensais
+- ✅ Seção de cobranças com status, valor, cliente e link de pagamento
 - ✅ Interface moderna e responsiva
 
 ## 🏗️ Arquitetura
@@ -65,12 +70,13 @@ Sistema completo de gestão financeira pessoal via WhatsApp com dashboard web, u
 backend/
 ├── app/
 │   ├── core/           # Configurações, database, segurança
-│   ├── models/         # Modelos SQLAlchemy
+│   ├── models/         # Modelos SQLAlchemy (User, Charge, PendingAction, ProviderEvent, etc.)
 │   ├── schemas/        # Schemas Pydantic
 │   ├── repositories/   # Camada de acesso a dados
-│   ├── services/       # Lógica de negócio
+│   ├── services/       # Lógica de negócio (AIService, ChargeService, PendingActionService)
 │   ├── routers/        # Endpoints da API
-│   ├── integrations/   # Twilio, OpenAI
+│   ├── providers/      # Camada desacoplada de provedores de pagamento (fake, mercado_pago)
+│   ├── integrations/   # Twilio, OpenAI, Mercado Pago
 │   ├── utils/          # Utilitários
 │   └── main.py         # Aplicação FastAPI
 ├── migrations/         # Migrações Alembic
@@ -139,6 +145,14 @@ NGROK_AUTHTOKEN=seu_ngrok_authtoken
 STRIPE_SECRET_KEY=sua_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=seu_stripe_webhook_secret
 
+# Mercado Pago (opcional, sandbox por padrão)
+MERCADO_PAGO_ACCESS_TOKEN=seu_mercado_pago_access_token
+MERCADO_PAGO_PUBLIC_KEY=seu_mercado_pago_public_key
+
+# PayFlow AI - provedor de pagamento: fake | mercado_pago
+# Padrão é fake (sandbox/seguro). Use mercado_pago apenas com credenciais sandbox.
+PAYFLOW_PAYMENT_PROVIDER=fake
+
 # Environment
 ENVIRONMENT=development
 LOG_LEVEL=INFO
@@ -192,6 +206,19 @@ docker-compose exec redis redis-cli ping
 Acesse a documentação interativa:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
+
+### Endpoints de Cobrança (PayFlow AI)
+
+- `GET /charges` - Lista cobranças do usuário autenticado
+- `POST /charges` - Cria uma nova cobrança (gera link de pagamento no provedor configurado)
+- `GET /charges/{id}` - Detalhes de uma cobrança
+- `POST /charges/{id}/cancel` - Cancela uma cobrança pendente
+
+### Webhooks de Provedores
+
+- `POST /provider-webhooks/fake` - Recebe eventos do provedor fake (sandbox)
+- `POST /provider-webhooks/fake/pay/{provider_charge_id}` - Simula pagamento de uma cobrança fake (apenas development/testing)
+- `POST /provider-webhooks/mercado-pago` - Recebe notificações do Mercado Pago para cobranças
 
 ## 📱 Configurar Webhook do Twilio
 
@@ -255,6 +282,21 @@ Mostre minhas últimas transações
 Quais foram meus gastos?
 ```
 
+### Criar Cobrança (PayFlow AI)
+```
+Gere uma cobrança de R$ 150 para João referente ao serviço do site
+Crie um link de pagamento de R$ 89,90 para Maria
+Quero cobrar R$ 300 do cliente Pedro
+```
+
+O assistente confirmará os dados e pedirá confirmação antes de gerar o link de pagamento. Responda `sim` ou `confirmo` para prosseguir.
+
+### Listar e Consultar Cobranças
+```
+Mostre minhas cobranças
+Alguma cobrança foi paga?
+```
+
 ## 🗄️ Modelos de Dados
 
 ### User
@@ -272,6 +314,15 @@ Quais foram meus gastos?
 ### ConversationLog
 - id, user_id, message, role (user/system/assistant), created_at
 
+### Charge (PayFlow AI)
+- id, user_id, customer_name, customer_phone, amount, description, provider, provider_charge_id, payment_link, status, due_date, paid_at, created_at, updated_at
+
+### PendingAction (PayFlow AI)
+- id, user_id, action_type, payload, status, expires_at, confirmed_at, executed_at, created_at
+
+### ProviderEvent (PayFlow AI)
+- id, provider, event_type, external_id, payload, processed, created_at, processed_at
+
 ## 🔐 Segurança
 
 - ✅ Senhas hasheadas com bcrypt
@@ -281,6 +332,9 @@ Quais foram meus gastos?
 - ✅ CORS configurado
 - ✅ Validação de dados com Pydantic
 - ✅ SQL injection protection (SQLAlchemy)
+- ✅ Confirmação explícita do usuário antes de criar cobranças (PayFlow AI)
+- ✅ Provedor de pagamento padrão fake/sandbox (PayFlow AI)
+- ✅ Nenhuma operação de Pix Out, boleto pagamento ou saque implementada (PayFlow AI)
 
 ## 🚀 Deploy em Produção
 

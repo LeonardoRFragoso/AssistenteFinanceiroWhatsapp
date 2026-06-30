@@ -18,3 +18,5 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     reminders = relationship("Reminder", back_populates="user", cascade="all, delete-orphan")
     conversation_logs = relationship("ConversationLog", back_populates="user", cascade="all, delete-orphan")
+    charges = relationship("Charge", back_populates="user", cascade="all, delete-orphan")
+    pending_actions = relationship("PendingAction", back_populates="user", cascade="all, delete-orphan")

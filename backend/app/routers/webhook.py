@@ -10,6 +10,8 @@ from app.services.ai_service import AIService
 from app.services.transaction_service import TransactionService
 from app.services.reminder_service import ReminderService
 from app.services.report_service import ReportService
+from app.services.charge_service import ChargeService
+from app.services.pending_action_service import PendingActionService
 from app.repositories.user_repository import UserRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.schemas.transaction import TransactionCreate
@@ -37,27 +39,27 @@ async def whatsapp_webhook(
     db: AsyncSession = Depends(get_db)
 ):
     twilio_service = TwilioWhatsAppService()
-    
+
     # Log incoming webhook
     logger.info(f"📱 Webhook received - From: {From}, Body: {Body}, MessageSid: {MessageSid}")
-    
-    # TODO: Fix Twilio signature validation for Railway
-    # Temporarily disabled due to URL mismatch between Twilio and Railway
-    # Validate Twilio signature
-    # twilio_signature = request.headers.get("X-Twilio-Signature", "")
-    # url = str(request.url)
-    # 
-    # # Get form data for validation
-    # form_data = await request.form()
-    # params = {key: value for key, value in form_data.items()}
-    # 
-    # if not twilio_service.validate_request(url, params, twilio_signature):
-    #     logger.warning(f"Invalid Twilio signature for webhook from {From}")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Invalid request signature"
-    #     )
-    
+
+    # Validate Twilio signature unless explicitly disabled (development only)
+    if settings.TWILIO_VALIDATE_SIGNATURE:
+        twilio_signature = request.headers.get("X-Twilio-Signature", "")
+        url = str(request.url)
+
+        form_data = await request.form()
+        params = {key: value for key, value in form_data.items()}
+
+        if not twilio_service.validate_request(url, params, twilio_signature):
+            logger.warning(f"Invalid Twilio signature for webhook from {From}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid request signature"
+            )
+    else:
+        logger.warning("Twilio signature validation is disabled - this should only be used in development")
+
     try:
         phone_number = twilio_service.extract_phone_number(From)
         logger.info(f"📞 Extracted phone number: {phone_number}")
@@ -109,10 +111,11 @@ async def whatsapp_webhook(
         
         if not user:
             response_message = (
-                "👋 Olá! Seja bem-vindo(a) ao *Assistente Financeiro*!\n\n"
+                "👋 Olá! Seja bem-vindo(a) ao *PayFlow AI*!\n\n"
                 "Vejo que você ainda não tem cadastro. Não se preocupe, é rápido e fácil!\n\n"
-                "✨ *Com o Assistente Financeiro você pode:*\n"
+                "✨ *Com o PayFlow AI você pode:*\n"
                 "💰 Registrar despesas e receitas por voz ou texto\n"
+                "📲 Criar cobranças e links de pagamento pelo WhatsApp\n"
                 "📊 Ver relatórios e gráficos detalhados\n"
                 "🔔 Criar lembretes de pagamentos\n"
                 "🤖 Conversar comigo aqui no WhatsApp 24/7\n"
@@ -121,7 +124,7 @@ async def whatsapp_webhook(
                 f"{settings.FRONTEND_URL}/register\n\n"
                 "Após o cadastro, é só me enviar uma mensagem e começamos! 😊"
             )
-            
+
             await twilio_service.send_message(From, response_message)
             return {"status": "success", "message": "User not registered"}
         
@@ -156,11 +159,22 @@ async def whatsapp_webhook(
             logger.warning(f"Failed to save user message to conversation log: {str(e)}")
         
         context = await conversation_repo.get_context(user.id, limit=5)
-        
+
         classification = await ai_service.classify_intent(message_text, context)
         intent = classification.get("intent")
         entities = classification.get("entities", {})
-        
+
+        # Fast-path for confirmation/cancellation when a pending action exists.
+        if intent in ("help", "confirm_pending_action", "cancel_pending_action") or not intent:
+            detected = ai_service.detect_confirmation(message_text)
+            if detected:
+                intent = detected
+
+        # Fallback local extraction for charge entities when AI misses values.
+        if intent == "create_pix_charge" and (not entities.get("amount") or not entities.get("customer_name")):
+            local_entities = ai_service.extract_charge_entities(message_text)
+            entities = {**local_entities, **entities}
+
         if intent in ("register_expense", "register_income"):
             plan_service = PlanLimitService(db)
             allowed, limit_message = await plan_service.check_transaction_limit(user.id)
@@ -234,7 +248,22 @@ async def process_intent(
         
         elif intent == "list_transactions":
             return await handle_list_transactions(user_id, entities, db, ai_service, context)
-        
+
+        elif intent == "create_pix_charge":
+            return await handle_create_pix_charge(user_id, entities, db, ai_service, context)
+
+        elif intent == "confirm_pending_action":
+            return await handle_confirm_pending_action(user_id, entities, db, ai_service, context)
+
+        elif intent == "cancel_pending_action":
+            return await handle_cancel_pending_action(user_id, entities, db, ai_service, context)
+
+        elif intent == "list_charges":
+            return await handle_list_charges(user_id, entities, db, ai_service, context)
+
+        elif intent == "check_charge_status":
+            return await handle_check_charge_status(user_id, entities, db, ai_service, context)
+
         else:
             return await handle_help(ai_service, context)
     
@@ -473,6 +502,146 @@ async def handle_list_transactions(
         return "Erro ao listar transações. Tente novamente."
 
 
+async def handle_create_pix_charge(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        amount = entities.get("amount")
+        customer_name = entities.get("customer_name")
+        customer_phone = entities.get("customer_phone")
+        description = entities.get("description")
+        due_date = entities.get("due_date")
+
+        if not amount or not customer_name:
+            return "Para criar uma cobrança, informe o valor e o nome do cliente. Exemplo: 'Gere uma cobrança de R$ 150 para João'"
+
+        pending_service = PendingActionService(db)
+        action = await pending_service.create_charge_action(
+            user_id=user_id,
+            amount=float(amount),
+            customer_name=customer_name,
+            description=description,
+            customer_phone=customer_phone,
+            due_date=due_date
+        )
+
+        return pending_service.format_charge_summary(action)
+
+    except Exception as e:
+        logger.error(f"Error creating pending charge action: {str(e)}")
+        return "Erro ao preparar cobrança. Verifique os dados e tente novamente."
+
+
+async def handle_confirm_pending_action(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        pending_service = PendingActionService(db)
+        action = await pending_service.get_pending_action(user_id)
+
+        if not action:
+            return "Não encontrei nenhuma ação pendente para confirmar."
+
+        charge = await pending_service.confirm_and_execute(action.id, user_id)
+        if not charge:
+            return "Não consegui gerar a cobrança. Verifique os dados e tente novamente."
+
+        message = (
+            f"✅ *Cobrança criada com sucesso!*\n\n"
+            f"👤 Cliente: {charge.customer_name}\n"
+            f"💰 Valor: R$ {float(charge.amount):.2f}\n"
+        )
+        if charge.description:
+            message += f"📝 Referente a: {charge.description}\n"
+        if charge.payment_link:
+            message += f"🔗 Link de pagamento: {charge.payment_link}\n"
+        message += "\nVou te avisar assim que o pagamento for confirmado. 🔔"
+        return message
+
+    except Exception as e:
+        logger.error(f"Error confirming pending action: {str(e)}")
+        return "Erro ao confirmar ação. Tente novamente."
+
+
+async def handle_cancel_pending_action(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        pending_service = PendingActionService(db)
+        action = await pending_service.cancel_latest_pending(user_id)
+
+        if not action:
+            return "Não encontrei nenhuma ação pendente para cancelar."
+
+        return "🚫 Ação cancelada. Se precisar, é só pedir novamente!"
+
+    except Exception as e:
+        logger.error(f"Error cancelling pending action: {str(e)}")
+        return "Erro ao cancelar ação. Tente novamente."
+
+
+async def handle_list_charges(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        charge_service = ChargeService(db)
+        charges = await charge_service.get_user_charges(user_id, limit=5)
+
+        if not charges:
+            return "Você ainda não tem cobranças criadas."
+
+        message = "📋 *Últimas cobranças:*\n\n"
+        for c in charges:
+            status_emoji = "✅" if c.status.value == "paid" else "⏳"
+            message += f"{status_emoji} R$ {float(c.amount):.2f} - {c.customer_name} ({c.status.value})\n"
+
+        message += "\nPara ver todas, acesse o dashboard web!"
+        return message
+
+    except Exception as e:
+        logger.error(f"Error listing charges: {str(e)}")
+        return "Erro ao listar cobranças. Tente novamente."
+
+
+async def handle_check_charge_status(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        charge_service = ChargeService(db)
+        charges = await charge_service.get_user_charges(user_id, limit=1)
+
+        if not charges:
+            return "Você ainda não tem cobranças para consultar."
+
+        charge = charges[0]
+        status_label = "paga" if charge.status.value == "paid" else charge.status.value
+        return f"A cobrança mais recente de *R$ {float(charge.amount):.2f}* para *{charge.customer_name}* está *{status_label}*."
+
+    except Exception as e:
+        logger.error(f"Error checking charge status: {str(e)}")
+        return "Erro ao consultar status da cobrança. Tente novamente."
+
+
 async def handle_help(ai_service: AIService, context: str) -> str:
     return """👋 Como posso ajudar?
 
@@ -483,6 +652,9 @@ Exemplo: "Gastei R$ 50 com almoço"
 
 💵 Registrar receitas
 Exemplo: "Recebi R$ 3000 de salário"
+
+📲 Criar cobranças
+Exemplo: "Gere uma cobrança de R$ 150 para João referente ao serviço do site"
 
 📊 Ver resumo financeiro
 Exemplo: "Quanto gastei esse mês?"

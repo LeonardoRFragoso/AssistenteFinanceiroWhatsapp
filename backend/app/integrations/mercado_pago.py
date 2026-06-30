@@ -175,6 +175,25 @@ class MercadoPagoService:
         except Exception as e:
             logger.error(f"Error validating webhook signature: {str(e)}")
             return False
+
+    def validate_webhook_signature_from_url(self, url: str, x_signature: str, x_request_id: str) -> bool:
+        """Validate Mercado Pago webhook signature extracting query params from a URL.
+
+        This wrapper keeps the original validate_webhook_signature signature intact
+        for backwards compatibility while allowing callers that only have the full
+        request URL to perform validation.
+        """
+        from urllib.parse import urlparse, parse_qs
+        try:
+            parsed = urlparse(url)
+            query_params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+            return self.validate_webhook_signature(
+                query_params=query_params,
+                headers={"x-signature": x_signature, "x-request-id": x_request_id}
+            )
+        except Exception as e:
+            logger.error(f"Error validating webhook signature from URL: {str(e)}")
+            return False
     
     def process_webhook_notification(self, notification_data: Dict) -> Dict[str, Any]:
         try:

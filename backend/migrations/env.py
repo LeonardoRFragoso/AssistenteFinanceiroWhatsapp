@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.database import Base
 from app.core.config import settings
-from app.models import User, Subscription, Transaction, Reminder, ConversationLog, Plan, PaymentEvent, ConversationState
+from app.models import User, Subscription, Transaction, Reminder, ConversationLog, Plan, PaymentEvent, ConversationState, Charge, PendingAction, ProviderEvent
 
 config = context.config
 

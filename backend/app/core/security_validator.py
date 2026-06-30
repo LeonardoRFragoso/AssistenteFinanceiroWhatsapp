@@ -58,7 +58,13 @@ def validate_production_config():
     # Validate Mercado Pago webhook secret exists
     if not settings.MERCADO_PAGO_WEBHOOK_SECRET:
         logger.warning("⚠️  MERCADO_PAGO_WEBHOOK_SECRET not set - webhook validation will fail")
-    
+
+    # Validate Twilio webhook signature validation is enabled in production
+    if not settings.TWILIO_VALIDATE_SIGNATURE:
+        logger.critical("🚨 CRITICAL SECURITY ERROR: TWILIO_VALIDATE_SIGNATURE is disabled in production!")
+        logger.critical("WhatsApp webhook signature validation must be enabled in production.")
+        sys.exit(1)
+
     # Validate JWT expiration is reasonable
     if settings.ACCESS_TOKEN_EXPIRE_MINUTES > 1440:  # 24 hours
         logger.warning(f"⚠️  ACCESS_TOKEN_EXPIRE_MINUTES is {settings.ACCESS_TOKEN_EXPIRE_MINUTES} - consider shorter expiration for security")

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from app.core.database import engine, Base
 from app.core.redis import init_redis, close_redis
 from app.core.logging import logger
-from app.routers import auth, transactions, reminders, reports, webhook, billing, admin, admin_crud, test, health
+from app.routers import auth, transactions, reminders, reports, webhook, billing, admin, admin_crud, test, health, charges, provider_webhooks
 from app.utils.security_middleware import SecurityHeadersMiddleware, IPRateLimitMiddleware
 from app.core.config import settings
 from app.core.security_validator import validate_production_config
@@ -44,8 +44,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Financial Assistant API",
-    description="SaaS Financial Assistant via WhatsApp",
+    title="PayFlow AI API",
+    description="PayFlow AI - Assistente financeiro transacional via WhatsApp para autônomos, MEIs e pequenos negócios",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -75,6 +75,8 @@ app.include_router(reminders.router)
 app.include_router(reports.router)
 app.include_router(webhook.router)
 app.include_router(billing.router)
+app.include_router(charges.router)
+app.include_router(provider_webhooks.router)
 app.include_router(admin.router)
 app.include_router(admin_crud.router)
 app.include_router(test.router)
@@ -84,7 +86,7 @@ app.include_router(health.router)
 @app.get("/")
 async def root():
     return {
-        "message": "Financial Assistant API",
+        "message": "PayFlow AI API",
         "version": "1.0.0",
         "status": "running"
     }

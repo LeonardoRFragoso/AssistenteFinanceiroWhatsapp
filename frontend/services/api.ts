@@ -80,6 +80,13 @@ export const billingAPI = {
   cancelSubscription: () => api.post('/billing/cancel-subscription'),
 };
 
+export const chargesAPI = {
+  getAll: (limit = 50) => api.get(`/charges/?limit=${limit}`),
+  getById: (id: number) => api.get(`/charges/${id}`),
+  create: (data: any) => api.post('/charges/', data),
+  cancel: (id: number) => api.post(`/charges/${id}/cancel`),
+};
+
 export const adminAPI = {
   getMetrics: () => api.get('/admin/metrics'),
   getFunnel: () => api.get('/admin/funnel'),

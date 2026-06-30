@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import WhatsAppConnect from '../components/WhatsAppConnect';
-import { reportsAPI, billingAPI } from '../services/api';
+import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2 } from 'lucide-react';
 
 interface DashboardData {
   summary: {
@@ -28,10 +28,23 @@ interface Usage {
   percentage: number;
 }
 
+interface Charge {
+  id: number;
+  customer_name: string;
+  customer_phone?: string;
+  amount: number;
+  description?: string;
+  status: string;
+  payment_link?: string;
+  created_at: string;
+  paid_at?: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [charges, setCharges] = useState<Charge[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -46,12 +59,14 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [dashRes, usageRes] = await Promise.all([
+      const [dashRes, usageRes, chargesRes] = await Promise.all([
         reportsAPI.getDashboard(),
         billingAPI.getUsage(),
+        chargesAPI.getAll(5),
       ]);
       setData(dashRes.data);
       setUsage(usageRes.data);
+      setCharges(chargesRes.data?.items || []);
     } catch (err: any) {
       setError(getErrorMessage(err));
     } finally {
@@ -354,6 +369,57 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Charges - Modern card */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Cobranças</h3>
+            </div>
+          </div>
+          <div className="p-6">
+            {charges.length > 0 ? (
+              <div className="space-y-3">
+                {charges.map((c) => (
+                  <div key={c.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg ${c.status === 'paid' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                        <Receipt className={`w-4 h-4 ${c.status === 'paid' ? 'text-emerald-600 dark:text-emerald-400' : 'text-yellow-600 dark:text-yellow-400'}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                          {c.customer_name}{c.description ? ` - ${c.description}` : ''}
+                        </p>
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(c.created_at).toLocaleDateString('pt-BR')}
+                          <span className="ml-2 capitalize">{c.status === 'paid' ? 'Pago' : c.status === 'pending' ? 'Pendente' : c.status}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      <span className={`text-sm font-bold ${c.status === 'paid' ? 'text-emerald-600 dark:text-emerald-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                        R$ {Number(c.amount).toFixed(2)}
+                      </span>
+                      {c.payment_link && (
+                        <a href={c.payment_link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" title="Abrir link de pagamento">
+                          <Link2 className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Receipt className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma cobrança criada</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Use o WhatsApp para criar cobranças</p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* WhatsApp Connection */}
         <WhatsAppConnect />

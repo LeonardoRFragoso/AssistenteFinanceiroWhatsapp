@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
     TWILIO_WHATSAPP_NUMBER: Optional[str] = None
-    
+    TWILIO_VALIDATE_SIGNATURE: bool = True
+
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o"
     
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     MERCADO_PAGO_ACCESS_TOKEN: Optional[str] = None
     MERCADO_PAGO_PUBLIC_KEY: Optional[str] = None
     MERCADO_PAGO_WEBHOOK_SECRET: Optional[str] = None
+
+    PAYFLOW_PAYMENT_PROVIDER: str = "fake"
     
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
