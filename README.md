@@ -58,9 +58,20 @@ cd backend
 source .venv/bin/activate
 pytest -v tests
 
-# Frontend
+# Frontend build
 cd frontend
 npm run build
+
+# E2E (full demo stack)
+docker-compose -f docker-compose.demo.yml up -d --build
+./scripts/wait-for-url.sh http://localhost:8001/health/ready 120
+./scripts/wait-for-url.sh http://localhost:3001 120
+cd frontend && E2E_BASE_URL=http://localhost:3001 npm run test:e2e
+cd .. && docker-compose -f docker-compose.demo.yml down -v
+
+# E2E (frontend dev only — sem backend)
+cd frontend
+npm run test:e2e
 ```
 
 ### Limitações conscientes
@@ -73,10 +84,9 @@ npm run build
 
 ### Próximos passos
 
-- Testes E2E (Playwright)
-- Observabilidade (Sentry, métricas)
 - Multi-tenant
 - Integração com mais provedores de pagamento
+- Dashboard de admin avançado
 
 ## � Como Testar o WhatsApp
 
@@ -537,12 +547,25 @@ curl http://localhost:8000/health
 ```bash
 # Backend
 cd backend
-pytest
+source .venv/bin/activate
+pytest -v tests
 
-# Frontend
+# Frontend build
 cd frontend
-npm test
+npm run build
+
+# E2E com demo stack (recomendado)
+docker-compose -f docker-compose.demo.yml up -d --build
+./scripts/wait-for-url.sh http://localhost:8001/health/ready 120
+./scripts/wait-for-url.sh http://localhost:3001 120
+cd frontend && E2E_BASE_URL=http://localhost:3001 npm run test:e2e
+cd .. && docker-compose -f docker-compose.demo.yml down -v
+
+# E2E frontend dev only (sem backend, mock tokens)
+cd frontend && npm run test:e2e
 ```
+
+Veja `docs/E2E_TESTING.md` para detalhes completos.
 
 ## 📈 Escalabilidade
 
