@@ -222,6 +222,21 @@ Acesse a documentação interativa:
 - `POST /charges/{id}/cancel` - Cancela uma cobrança pendente
 - `POST /charges/reminders/run` - Dispara lembretes de vencimento manualmente (dev apenas)
 
+#### Campos do `GET /charges/summary`
+
+| Campo | Descrição |
+| --- | --- |
+| `total_pending` | Soma de cobranças `pending` **não vencidas** (due_date null ou due_date >= hoje) |
+| `total_overdue` | Soma de cobranças `pending` **vencidas** (due_date < hoje) |
+| `total_receivable` | Soma de `total_pending + total_overdue` (tudo a receber) |
+| `total_paid` | Soma de cobranças `paid` |
+| `count_pending` | Quantidade de pendentes não vencidas |
+| `count_overdue` | Quantidade de pendentes vencidas |
+| `count_paid` | Quantidade de pagas |
+| `count_cancelled` | Quantidade de canceladas |
+
+> **Regra:** cobranças vencidas não entram em `total_pending` ou `count_pending`. O card "A Receber" do dashboard usa `total_receivable` para mostrar o total completo (pendentes + vencidas).
+
 ### Webhooks de Provedores
 
 - `POST /provider-webhooks/fake` - Recebe eventos do provedor fake (sandbox)

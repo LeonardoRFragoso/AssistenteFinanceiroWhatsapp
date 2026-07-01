@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc, func, case
+from sqlalchemy import select, and_, or_, desc, func, case
 from typing import List, Optional
 from decimal import Decimal
 from datetime import datetime, date, timedelta
@@ -150,11 +150,27 @@ class ChargeRepository:
 
     async def get_summary(self, user_id: int) -> dict:
         today = date.today()
+
+        # Conditions:
+        #   pending_not_overdue: status=PENDING AND (due_date IS NULL OR due_date >= today)
+        #   overdue:             status=PENDING AND due_date IS NOT NULL AND due_date < today
+        #   paid:                status=PAID
+        #   cancelled:           status=CANCELLED
+        pending_not_overdue = and_(
+            Charge.status == ChargeStatus.PENDING,
+            or_(Charge.due_date.is_(None), Charge.due_date >= today)
+        )
+        overdue = and_(
+            Charge.status == ChargeStatus.PENDING,
+            Charge.due_date.isnot(None),
+            Charge.due_date < today
+        )
+
         query = select(
             func.coalesce(
                 func.sum(
                     case(
-                        (and_(Charge.status == ChargeStatus.PENDING, Charge.due_date.is_(None)), Charge.amount),
+                        (pending_not_overdue, Charge.amount),
                         else_=0
                     )
                 ), 0
@@ -170,14 +186,14 @@ class ChargeRepository:
             func.coalesce(
                 func.sum(
                     case(
-                        (and_(Charge.status == ChargeStatus.PENDING, Charge.due_date.isnot(None), Charge.due_date < today), Charge.amount),
+                        (overdue, Charge.amount),
                         else_=0
                     )
                 ), 0
             ).label("total_overdue"),
             func.count(
                 case(
-                    (Charge.status == ChargeStatus.PENDING, 1),
+                    (pending_not_overdue, 1),
                     else_=None
                 )
             ).label("count_pending"),
@@ -189,7 +205,7 @@ class ChargeRepository:
             ).label("count_paid"),
             func.count(
                 case(
-                    (and_(Charge.status == ChargeStatus.PENDING, Charge.due_date.isnot(None), Charge.due_date < today), 1),
+                    (overdue, 1),
                     else_=None
                 )
             ).label("count_overdue"),
@@ -203,10 +219,13 @@ class ChargeRepository:
 
         result = await self.db.execute(query)
         row = result.one()
+        total_pending = Decimal(str(row.total_pending))
+        total_overdue = Decimal(str(row.total_overdue))
         return {
-            "total_pending": Decimal(str(row.total_pending)),
+            "total_pending": total_pending,
             "total_paid": Decimal(str(row.total_paid)),
-            "total_overdue": Decimal(str(row.total_overdue)),
+            "total_overdue": total_overdue,
+            "total_receivable": total_pending + total_overdue,
             "count_pending": row.count_pending or 0,
             "count_paid": row.count_paid or 0,
             "count_overdue": row.count_overdue or 0,

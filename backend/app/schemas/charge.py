@@ -53,6 +53,7 @@ class ChargeSummaryResponse(BaseModel):
     total_pending: Decimal
     total_paid: Decimal
     total_overdue: Decimal
+    total_receivable: Decimal
     count_pending: int
     count_paid: int
     count_overdue: int

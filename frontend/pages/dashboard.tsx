@@ -46,6 +46,7 @@ interface ChargeSummary {
   total_pending: number;
   total_paid: number;
   total_overdue: number;
+  total_receivable: number;
   count_pending: number;
   count_paid: number;
   count_overdue: number;
@@ -465,7 +466,7 @@ export default function Dashboard() {
                 <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                 <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">A Receber</span>
               </div>
-              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">R$ {Number(chargeSummary.total_pending + chargeSummary.total_overdue).toFixed(2)}</p>
+              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">R$ {Number(chargeSummary.total_receivable).toFixed(2)}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{chargeSummary.count_pending + chargeSummary.count_overdue} cobrança(s)</p>
             </div>
             <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl shadow-lg p-5 border border-emerald-200 dark:border-emerald-800">
@@ -481,7 +482,7 @@ export default function Dashboard() {
                 <Receipt className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                 <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">Pendentes</span>
               </div>
-              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{chargeSummary.count_pending - chargeSummary.count_overdue}</p>
+              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{chargeSummary.count_pending}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">aguardando pagamento</p>
             </div>
             <div className="bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-2xl shadow-lg p-5 border border-red-200 dark:border-red-800">

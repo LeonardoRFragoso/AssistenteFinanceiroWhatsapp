@@ -119,6 +119,8 @@ async def test_get_summary(db_session, sample_user):
     assert summary.count_paid == 1
     assert summary.total_paid == Decimal("200.00")
     assert summary.total_pending == Decimal("100.00")
+    assert summary.total_receivable == Decimal("100.00")
+    assert summary.count_overdue == 0
 
 
 @pytest.mark.asyncio
@@ -135,6 +137,9 @@ async def test_summary_with_overdue(db_session, sample_user):
     summary = await service.get_summary(sample_user.id)
     assert summary.count_overdue == 1
     assert summary.total_overdue == Decimal("300.00")
+    assert summary.count_pending == 0
+    assert summary.total_pending == Decimal("0")
+    assert summary.total_receivable == Decimal("300.00")
 
 
 @pytest.mark.asyncio
@@ -276,3 +281,79 @@ async def test_get_paid_charges(db_session, sample_user):
     assert len(paid_charges) == 1
     assert paid_charges[0].status == ChargeStatus.PAID
 
+
+@pytest.mark.asyncio
+async def test_summary_full_scenario(db_session, sample_user):
+    """Test all summary fields with a mix of charge statuses and due dates.
+
+    Scenario:
+      A: pending, due_date null,       R$ 100  -> total_pending
+      B: pending, due_date tomorrow,   R$ 200  -> total_pending
+      C: pending, due_date yesterday,  R$ 300  -> total_overdue
+      D: paid,                         R$ 400  -> total_paid
+      E: cancelled,                    R$ 500  -> excluded from all totals
+    """
+    service = ChargeService(db_session)
+    tomorrow = date.today() + timedelta(days=1)
+    yesterday = date.today() - timedelta(days=1)
+
+    # A: pending, no due_date
+    await service.create_charge(sample_user.id, ChargeCreate(
+        customer_name="A Pendente Sem Vencimento",
+        amount=Decimal("100.00"),
+        provider="fake"
+    ))
+    # B: pending, due_date in future
+    await service.create_charge(sample_user.id, ChargeCreate(
+        customer_name="B Pendente Futura",
+        amount=Decimal("200.00"),
+        due_date=tomorrow,
+        provider="fake"
+    ))
+    # C: pending, due_date in past (overdue)
+    await service.create_charge(sample_user.id, ChargeCreate(
+        customer_name="C Vencida",
+        amount=Decimal("300.00"),
+        due_date=yesterday,
+        provider="fake"
+    ))
+    # D: paid
+    paid = await service.create_charge(sample_user.id, ChargeCreate(
+        customer_name="D Paga",
+        amount=Decimal("400.00"),
+        provider="fake"
+    ))
+    payload = {
+        "event_type": "payment.approved",
+        "provider_charge_id": paid.provider_charge_id,
+        "amount": 400.0
+    }
+    await service.process_webhook_payload("fake", payload)
+    # E: cancelled
+    cancelled = await service.create_charge(sample_user.id, ChargeCreate(
+        customer_name="E Cancelada",
+        amount=Decimal("500.00"),
+        provider="fake"
+    ))
+    await service.cancel_charge(cancelled.id, sample_user.id)
+
+    summary = await service.get_summary(sample_user.id)
+
+    # total_pending: A (100) + B (200) = 300 — excludes overdue C
+    assert summary.total_pending == Decimal("300.00")
+    # total_overdue: C (300) only
+    assert summary.total_overdue == Decimal("300.00")
+    # total_receivable: pending + overdue = 300 + 300 = 600
+    assert summary.total_receivable == Decimal("600.00")
+    # total_paid: D (400)
+    assert summary.total_paid == Decimal("400.00")
+    # count_pending: A + B = 2 (not overdue)
+    assert summary.count_pending == 2
+    # count_overdue: C = 1
+    assert summary.count_overdue == 1
+    # count_paid: D = 1
+    assert summary.count_paid == 1
+    # count_cancelled: E = 1
+    assert summary.count_cancelled == 1
+    # Cancelled does not appear in any total
+    assert summary.total_pending + summary.total_overdue + summary.total_paid == Decimal("1000.00")
