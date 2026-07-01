@@ -58,6 +58,9 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 - ✅ Lembretes automáticos de vencimento e cobranças vencidas
 - ✅ Worker automático de lembretes via RQ (configurável, desativado por padrão)
 - ✅ Exportação de cobranças em CSV (com filtros por status e data)
+- ✅ Exportação de cobranças em PDF (com filtros, resumo e tabela detalhada)
+- ✅ Analytics de cobranças (taxa de conversão, tempo médio de pagamento, taxa de vencimento)
+- ✅ Paginação server-side de cobranças com busca e ordenação
 - ✅ Envio de link de pagamento para o cliente via WhatsApp (com confirmação)
 - ✅ Provider Mercado Pago sandbox (opcional, padrão continua fake)
 - ✅ IA que entende português informal
@@ -73,6 +76,10 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 - ✅ Tabela de cobranças com filtros por status (todas, pendentes, pagas, vencidas, canceladas)
 - ✅ Copiar link de pagamento e cancelar cobranças pendentes diretamente do dashboard
 - ✅ Botão de exportação CSV de cobranças (respeita filtro atual)
+- ✅ Botão de exportação PDF de cobranças (com resumo e tabela detalhada)
+- ✅ Cards de analytics (taxa de conversão, tempo médio de pagamento, total criado/pago, taxa de vencimento, canceladas)
+- ✅ Paginação de cobranças com busca por cliente/descrição
+- ✅ Estados de loading, erro e vazio na tabela de cobranças
 - ✅ Interface moderna e responsiva
 
 ## 🏗️ Arquitetura
@@ -220,13 +227,15 @@ Acesse a documentação interativa:
 
 ### Endpoints de Cobrança (PayFlow AI)
 
-- `GET /charges` - Lista cobranças do usuário autenticado (filtros por status)
+- `GET /charges` - Lista cobranças paginadas (page, page_size, status, search, start_date, end_date, sort_by, sort_order)
 - `GET /charges/summary` - Resumo estatístico (totais a receber, recebido, vencido, contagens)
+- `GET /charges/analytics` - Analytics de cobranças (taxa de conversão, tempo médio de pagamento, taxa de vencimento, totais por status)
 - `POST /charges` - Cria uma nova cobrança (gera link de pagamento no provedor configurado)
 - `GET /charges/{id}` - Detalhes de uma cobrança
 - `POST /charges/{id}/cancel` - Cancela uma cobrança pendente
 - `POST /charges/reminders/run` - Dispara lembretes de vencimento manualmente (dev apenas)
-- `GET /charges/export.csv` - Exporta cobranças do usuário em CSV (filtros por status, data inicial, data final)
+- `GET /charges/export.csv` - Exporta cobranças do usuário em CSV (filtros por status, data, busca)
+- `GET /charges/export.pdf` - Exporta cobranças em PDF com resumo e tabela detalhada (filtros por status, data, busca)
 
 #### Campos do `GET /charges/summary`
 

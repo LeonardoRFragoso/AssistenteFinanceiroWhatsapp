@@ -5,7 +5,7 @@ import WhatsAppConnect from '../components/WhatsAppConnect';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download, FileText, Search, ChevronLeft, ChevronRight, Activity, Percent } from 'lucide-react';
 
 interface DashboardData {
   summary: {
@@ -53,17 +53,41 @@ interface ChargeSummary {
   count_cancelled: number;
 }
 
+interface ChargeAnalytics {
+  conversion_rate: number;
+  average_payment_time_hours: number;
+  total_created: number;
+  total_paid: number;
+  total_cancelled: number;
+  total_overdue: number;
+  total_amount_created: number;
+  total_amount_paid: number;
+  overdue_rate: number;
+  payment_by_status: { pending: number; paid: number; overdue: number; cancelled: number };
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [charges, setCharges] = useState<Charge[]>([]);
   const [chargeSummary, setChargeSummary] = useState<ChargeSummary | null>(null);
+  const [chargeAnalytics, setChargeAnalytics] = useState<ChargeAnalytics | null>(null);
   const [chargeFilter, setChargeFilter] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [chargePage, setChargePage] = useState(1);
+  const [chargeTotal, setChargeTotal] = useState(0);
+  const [chargeTotalPages, setChargeTotalPages] = useState(1);
+  const [chargePageSize] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [chargesLoading, setChargesLoading] = useState(false);
+  const [chargesError, setChargesError] = useState('');
+  const [exportingCSV, setExportingCSV] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -76,16 +100,17 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [dashRes, usageRes, chargesRes, summaryRes] = await Promise.all([
+      const [dashRes, usageRes, summaryRes, analyticsRes] = await Promise.all([
         reportsAPI.getDashboard(),
         billingAPI.getUsage(),
-        chargesAPI.getAll(50),
         chargesAPI.getSummary(),
+        chargesAPI.getAnalytics(),
       ]);
       setData(dashRes.data);
       setUsage(usageRes.data);
-      setCharges(chargesRes.data?.items || []);
       setChargeSummary(summaryRes.data);
+      setChargeAnalytics(analyticsRes.data);
+      await loadCharges('all', 1, '');
     } catch (err: any) {
       setError(getErrorMessage(err));
     } finally {
@@ -93,25 +118,46 @@ export default function Dashboard() {
     }
   };
 
-  const loadCharges = async (filter: string) => {
+  const loadCharges = async (filter: string, page: number = 1, search: string = '') => {
+    setChargesLoading(true);
+    setChargesError('');
     try {
       const statusParam = filter === 'all' ? undefined : filter === 'overdue' ? 'pending' : filter;
-      const res = await chargesAPI.getAll(50, statusParam);
+      const res = await chargesAPI.getPaginated(page, chargePageSize, statusParam, search || undefined);
       setCharges(res.data?.items || []);
+      setChargeTotal(res.data?.total || 0);
+      setChargeTotalPages(res.data?.total_pages || 1);
+      setChargePage(page);
     } catch (err: any) {
+      setChargesError('Erro ao carregar cobranças.');
       console.error('Error loading charges:', err);
+    } finally {
+      setChargesLoading(false);
     }
   };
 
   const handleChargeFilterChange = (filter: string) => {
     setChargeFilter(filter);
-    loadCharges(filter);
+    setChargePage(1);
+    loadCharges(filter, 1, searchQuery);
+  };
+
+  const handleSearch = () => {
+    setSearchQuery(searchInput);
+    setChargePage(1);
+    loadCharges(chargeFilter, 1, searchInput);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > chargeTotalPages) return;
+    loadCharges(chargeFilter, newPage, searchQuery);
   };
 
   const handleExportCSV = async () => {
+    setExportingCSV(true);
     try {
       const statusParam = chargeFilter !== 'all' ? chargeFilter : undefined;
-      const response = await chargesAPI.exportCSV(statusParam);
+      const response = await chargesAPI.exportCSV(statusParam, searchQuery || undefined);
       const blob = new Blob([response.data], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -123,6 +169,29 @@ export default function Dashboard() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       alert('Erro ao exportar CSV. Tente novamente.');
+    } finally {
+      setExportingCSV(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExportingPDF(true);
+    try {
+      const statusParam = chargeFilter !== 'all' ? chargeFilter : undefined;
+      const response = await chargesAPI.exportPDF(statusParam, searchQuery || undefined);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `charges_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Erro ao exportar PDF. Tente novamente.');
+    } finally {
+      setExportingPDF(false);
     }
   };
 
@@ -140,9 +209,13 @@ export default function Dashboard() {
     setCancellingId(id);
     try {
       await chargesAPI.cancel(id);
-      await loadCharges(chargeFilter);
-      const summaryRes = await chargesAPI.getSummary();
+      await loadCharges(chargeFilter, chargePage, searchQuery);
+      const [summaryRes, analyticsRes] = await Promise.all([
+        chargesAPI.getSummary(),
+        chargesAPI.getAnalytics(),
+      ]);
       setChargeSummary(summaryRes.data);
+      setChargeAnalytics(analyticsRes.data);
     } catch (err: any) {
       console.error('Error cancelling charge:', err);
     } finally {
@@ -172,13 +245,6 @@ export default function Dashboard() {
     expired: 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30',
     failed: 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30',
   };
-
-  const filteredCharges = charges.filter((c) => {
-    const displayStatus = getChargeDisplayStatus(c);
-    if (chargeFilter === 'all') return true;
-    if (chargeFilter === 'overdue') return displayStatus === 'overdue';
-    return displayStatus === chargeFilter;
-  });
 
   if (loading) {
     return (
@@ -514,112 +580,248 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Charge Analytics Cards */}
+        {chargeAnalytics && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl shadow-lg p-5 border border-indigo-200 dark:border-indigo-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Percent className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">Taxa de Conversão</span>
+              </div>
+              <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{chargeAnalytics.conversion_rate}%</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">pagas / criadas (excl. canceladas)</p>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl shadow-lg p-5 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Tempo Médio de Pagto</span>
+              </div>
+              <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{chargeAnalytics.average_payment_time_hours}h</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">criação até pagamento</p>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl shadow-lg p-5 border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Total Criado</span>
+              </div>
+              <p className="text-xl font-bold text-purple-600 dark:text-purple-400">R$ {Number(chargeAnalytics.total_amount_created).toFixed(2)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{chargeAnalytics.total_created} cobrança(s)</p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl shadow-lg p-5 border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Total Pago</span>
+              </div>
+              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">R$ {Number(chargeAnalytics.total_amount_paid).toFixed(2)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{chargeAnalytics.total_paid} cobrança(s)</p>
+            </div>
+            <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 rounded-2xl shadow-lg p-5 border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-300">Taxa de Vencimento</span>
+              </div>
+              <p className="text-xl font-bold text-red-600 dark:text-red-400">{chargeAnalytics.overdue_rate}%</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{chargeAnalytics.total_overdue} vencida(s)</p>
+            </div>
+            <div className="bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-900/20 dark:to-slate-900/20 rounded-2xl shadow-lg p-5 border border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-2 mb-2">
+                <XCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Canceladas</span>
+              </div>
+              <p className="text-xl font-bold text-gray-600 dark:text-gray-400">{chargeAnalytics.total_cancelled}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">cobranças canceladas</p>
+            </div>
+          </div>
+        )}
+
         {/* Charges - Enhanced section */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Cobranças</h3>
+          <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Cobranças</h3>
+              </div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {['all', 'pending', 'paid', 'overdue', 'cancelled'].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => handleChargeFilterChange(f)}
+                    className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${
+                      chargeFilter === f
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : f === 'paid' ? 'Pagas' : f === 'overdue' ? 'Vencidas' : 'Canceladas'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center gap-1 flex-wrap">
-              {['all', 'pending', 'paid', 'overdue', 'cancelled'].map((f) => (
-                <button
-                  key={f}
-                  onClick={() => handleChargeFilterChange(f)}
-                  className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${
-                    chargeFilter === f
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : f === 'paid' ? 'Pagas' : f === 'overdue' ? 'Vencidas' : 'Canceladas'}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="Buscar por cliente ou descrição..."
+                  className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <button
+                onClick={handleSearch}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
+              >
+                Buscar
+              </button>
               <button
                 onClick={handleExportCSV}
-                className="ml-2 px-3 py-1 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all flex items-center gap-1"
+                disabled={exportingCSV}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all flex items-center gap-1 disabled:opacity-50"
               >
-                <Download className="w-3 h-3" />
-                Exportar CSV
+                {exportingCSV ? (
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Download className="w-3 h-3" />
+                )}
+                CSV
+              </button>
+              <button
+                onClick={handleExportPDF}
+                disabled={exportingPDF}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all flex items-center gap-1 disabled:opacity-50"
+              >
+                {exportingPDF ? (
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <FileText className="w-3 h-3" />
+                )}
+                PDF
               </button>
             </div>
           </div>
           <div className="p-6">
-            {filteredCharges.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Cliente</th>
-                      <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Valor</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">Descrição</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Status</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Vencimento</th>
-                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Criada</th>
-                      <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCharges.map((c) => {
-                      const displayStatus = getChargeDisplayStatus(c);
-                      const statusLabel = statusLabelMap[displayStatus] || displayStatus;
-                      const statusColor = statusColorMap[displayStatus] || statusColorMap['pending'];
-                      const canCancel = displayStatus === 'pending' || displayStatus === 'overdue';
-                      return (
-                        <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                          <td className="py-3 px-3">
-                            <p className="font-medium text-gray-900 dark:text-gray-100">{c.customer_name}</p>
-                            {c.customer_phone && <p className="text-xs text-gray-400 dark:text-gray-500">{c.customer_phone}</p>}
-                          </td>
-                          <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">R$ {Number(c.amount).toFixed(2)}</td>
-                          <td className="py-3 px-3 hidden sm:table-cell text-gray-600 dark:text-gray-400 max-w-xs truncate">{c.description || '-'}</td>
-                          <td className="py-3 px-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
-                              {statusLabel}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400 text-xs">{c.due_date ? new Date(c.due_date + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
-                          <td className="py-3 px-3 hidden lg:table-cell text-gray-500 dark:text-gray-400 text-xs">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center justify-center gap-1">
-                              {c.payment_link && (
-                                <>
-                                  <a href={c.payment_link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" title="Abrir link">
-                                    <Link2 className="w-4 h-4" />
-                                  </a>
-                                  <button
-                                    onClick={() => handleCopyLink(c.id, c.payment_link!)}
-                                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                    title="Copiar link"
-                                  >
-                                    {copiedId === c.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                  </button>
-                                </>
-                              )}
-                              {canCancel && (
-                                <button
-                                  onClick={() => handleCancelCharge(c.id)}
-                                  disabled={cancellingId === c.id}
-                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
-                                  title="Cancelar cobrança"
-                                >
-                                  {cancellingId === c.id ? (
-                                    <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <XCircle className="w-4 h-4" />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {chargesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
               </div>
+            ) : chargesError ? (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-12 h-12 text-red-300 dark:text-red-600 mx-auto mb-3" />
+                <p className="text-sm text-red-600 dark:text-red-400">{chargesError}</p>
+                <button
+                  onClick={() => loadCharges(chargeFilter, chargePage, searchQuery)}
+                  className="mt-3 px-4 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-all"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
+            ) : charges.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Cliente</th>
+                        <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Valor</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">Descrição</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Status</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Vencimento</th>
+                        <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Criada</th>
+                        <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {charges.map((c: Charge) => {
+                        const displayStatus = getChargeDisplayStatus(c);
+                        const statusLabel = statusLabelMap[displayStatus] || displayStatus;
+                        const statusColor = statusColorMap[displayStatus] || statusColorMap['pending'];
+                        const canCancel = displayStatus === 'pending' || displayStatus === 'overdue';
+                        return (
+                          <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                            <td className="py-3 px-3">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">{c.customer_name}</p>
+                              {c.customer_phone && <p className="text-xs text-gray-400 dark:text-gray-500">{c.customer_phone}</p>}
+                            </td>
+                            <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">R$ {Number(c.amount).toFixed(2)}</td>
+                            <td className="py-3 px-3 hidden sm:table-cell text-gray-600 dark:text-gray-400 max-w-xs truncate">{c.description || '-'}</td>
+                            <td className="py-3 px-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                                {statusLabel}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400 text-xs">{c.due_date ? new Date(c.due_date + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                            <td className="py-3 px-3 hidden lg:table-cell text-gray-500 dark:text-gray-400 text-xs">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center justify-center gap-1">
+                                {c.payment_link && (
+                                  <>
+                                    <a href={c.payment_link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" title="Abrir link">
+                                      <Link2 className="w-4 h-4" />
+                                    </a>
+                                    <button
+                                      onClick={() => handleCopyLink(c.id, c.payment_link!)}
+                                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                      title="Copiar link"
+                                    >
+                                      {copiedId === c.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                    </button>
+                                  </>
+                                )}
+                                {canCancel && (
+                                  <button
+                                    onClick={() => handleCancelCharge(c.id)}
+                                    disabled={cancellingId === c.id}
+                                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                    title="Cancelar cobrança"
+                                  >
+                                    {cancellingId === c.id ? (
+                                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <XCircle className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Pagination */}
+                {chargeTotalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {chargeTotal} cobrança(s) — página {chargePage} de {chargeTotalPages}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(chargePage - 1)}
+                        disabled={chargePage <= 1}
+                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300 px-2">
+                        {chargePage} / {chargeTotalPages}
+                      </span>
+                      <button
+                        onClick={() => handlePageChange(chargePage + 1)}
+                        disabled={chargePage >= chargeTotalPages}
+                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="text-center py-8">
+              <div className="text-center py-12">
                 <Receipt className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                 <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma cobrança encontrada</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Use o WhatsApp para criar cobranças</p>

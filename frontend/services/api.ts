@@ -83,12 +83,33 @@ export const billingAPI = {
 export const chargesAPI = {
   getAll: (limit = 50, status?: string) =>
     api.get(`/charges/?limit=${limit}${status ? `&status=${status}` : ''}`),
+  getPaginated: (page = 1, pageSize = 20, status?: string, search?: string) => {
+    let url = `/charges/?page=${page}&page_size=${pageSize}`;
+    if (status) url += `&status=${status}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    return api.get(url);
+  },
   getById: (id: number) => api.get(`/charges/${id}`),
   create: (data: any) => api.post('/charges/', data),
   cancel: (id: number) => api.post(`/charges/${id}/cancel`),
   getSummary: () => api.get('/charges/summary'),
-  exportCSV: (status?: string) =>
-    api.get(`/charges/export.csv${status ? `?status=${status}` : ''}`, { responseType: 'blob' }),
+  getAnalytics: () => api.get('/charges/analytics'),
+  exportCSV: (status?: string, search?: string) => {
+    let url = `/charges/export.csv`;
+    const params: string[] = [];
+    if (status) params.push(`status=${status}`);
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return api.get(url, { responseType: 'blob' });
+  },
+  exportPDF: (status?: string, search?: string) => {
+    let url = `/charges/export.pdf`;
+    const params: string[] = [];
+    if (status) params.push(`status=${status}`);
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
+    if (params.length) url += `?${params.join('&')}`;
+    return api.get(url, { responseType: 'blob' });
+  },
 };
 
 export const adminAPI = {

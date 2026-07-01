@@ -75,6 +75,21 @@ services:
         condition: service_healthy
     command: python worker.py
 
+  reminder-scheduler:
+    build: ./backend
+    container_name: financial_assistant_scheduler
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python -m app.jobs.reminder_scheduler
+    restart: unless-stopped
+
   ngrok:
     image: ngrok/ngrok:latest
     container_name: financial_assistant_ngrok

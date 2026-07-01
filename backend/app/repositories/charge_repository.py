@@ -1,9 +1,17 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, desc, func, case
-from typing import List, Optional
+from sqlalchemy import select, and_, or_, desc, asc, func, case
+from typing import List, Optional, Tuple
 from decimal import Decimal
 from datetime import datetime, date, timedelta
 from app.models.charge import Charge, ChargeStatus
+
+
+VALID_SORT_FIELDS = {
+    "created_at": Charge.created_at,
+    "due_date": Charge.due_date,
+    "amount": Charge.amount,
+    "status": Charge.status,
+}
 
 
 class ChargeRepository:
@@ -282,3 +290,57 @@ class ChargeRepository:
             .order_by(desc(Charge.created_at))
         )
         return list(result.scalars().all())
+
+    async def get_paginated(
+        self,
+        user_id: int,
+        page: int = 1,
+        page_size: int = 20,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> Tuple[List[Charge], int]:
+        """Return a paginated list of charges for a user with filters and sorting."""
+        query = select(Charge).where(Charge.user_id == user_id)
+        count_query = select(func.count(Charge.id)).where(Charge.user_id == user_id)
+
+        if status:
+            query = query.where(Charge.status == status)
+            count_query = count_query.where(Charge.status == status)
+
+        if search:
+            pattern = f"%{search}%"
+            search_cond = or_(
+                Charge.customer_name.ilike(pattern),
+                Charge.description.ilike(pattern),
+            )
+            query = query.where(search_cond)
+            count_query = count_query.where(search_cond)
+
+        if start_date:
+            query = query.where(Charge.created_at >= start_date)
+            count_query = count_query.where(Charge.created_at >= start_date)
+
+        if end_date:
+            query = query.where(Charge.created_at <= end_date)
+            count_query = count_query.where(Charge.created_at <= end_date)
+
+        sort_col = VALID_SORT_FIELDS.get(sort_by, Charge.created_at)
+        if sort_order == "asc":
+            query = query.order_by(asc(sort_col))
+        else:
+            query = query.order_by(desc(sort_col))
+
+        offset = (page - 1) * page_size
+        query = query.offset(offset).limit(page_size)
+
+        result = await self.db.execute(query)
+        charges = list(result.scalars().all())
+
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar() or 0
+
+        return charges, total

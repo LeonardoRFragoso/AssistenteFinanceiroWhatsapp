@@ -55,3 +55,33 @@ class ReminderScheduler:
 
 
 scheduler = ReminderScheduler()
+
+
+if __name__ == "__main__":
+    import signal
+    import sys
+
+    if not settings.ENABLE_CHARGE_REMINDER_WORKER:
+        logger.info("ENABLE_CHARGE_REMINDER_WORKER is not set — enabling for CLI run")
+        settings.ENABLE_CHARGE_REMINDER_WORKER = True
+
+    scheduler.start()
+
+    def handle_sigterm(signum, frame):
+        logger.info("Received SIGTERM, stopping scheduler...")
+        scheduler.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+    signal.signal(signal.SIGINT, handle_sigterm)
+
+    logger.info(
+        f"Reminder scheduler running in foreground "
+        f"(interval={settings.CHARGE_REMINDER_INTERVAL_MINUTES}min). "
+        f"Press Ctrl+C to stop."
+    )
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        scheduler.stop()

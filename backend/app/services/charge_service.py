@@ -68,6 +68,39 @@ class ChargeService:
     async def get_user_charges(self, user_id: int, limit: int = 50, status: Optional[str] = None) -> List[Charge]:
         return await self.charge_repo.get_by_user(user_id, limit=limit, status=status)
 
+    async def get_charges_paginated(
+        self,
+        user_id: int,
+        page: int = 1,
+        page_size: int = 20,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> dict:
+        """Return paginated charges with total count and pagination metadata."""
+        charges, total = await self.charge_repo.get_paginated(
+            user_id=user_id,
+            page=page,
+            page_size=page_size,
+            status=status,
+            search=search,
+            start_date=start_date,
+            end_date=end_date,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+        total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+        return {
+            "items": charges,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+        }
+
     async def get_charge(self, charge_id: int, user_id: Optional[int] = None) -> Optional[Charge]:
         return await self.charge_repo.get_by_id(charge_id, user_id)
 

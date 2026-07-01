@@ -49,6 +49,14 @@ class ChargeListResponse(BaseModel):
     total: int
 
 
+class PaginatedChargeListResponse(BaseModel):
+    items: List[ChargeResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class ChargeSummaryResponse(BaseModel):
     total_pending: Decimal
     total_paid: Decimal
@@ -58,3 +66,16 @@ class ChargeSummaryResponse(BaseModel):
     count_paid: int
     count_overdue: int
     count_cancelled: int
+
+
+class ChargeAnalyticsResponse(BaseModel):
+    conversion_rate: float
+    average_payment_time_hours: float
+    total_created: int
+    total_paid: int
+    total_cancelled: int
+    total_overdue: int
+    total_amount_created: Decimal
+    total_amount_paid: Decimal
+    overdue_rate: float
+    payment_by_status: dict
