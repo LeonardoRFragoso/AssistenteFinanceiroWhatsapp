@@ -20,6 +20,8 @@ from app.schemas.conversation import ConversationLogCreate
 from app.models.conversation_log import MessageRole
 from app.models.transaction import TransactionType, PaymentMethod
 from app.utils.rate_limiter import whatsapp_rate_limiter
+from app.utils.webhook_rate_limiter import webhook_rate_limiter
+from app.core.audit_logger import log_webhook_received
 from app.services.plan_limit_service import PlanLimitService
 from app.repositories.subscription_repository import SubscriptionRepository
 from decimal import Decimal
@@ -40,10 +42,20 @@ async def whatsapp_webhook(
 ):
     twilio_service = TwilioWhatsAppService()
 
-    # Log incoming webhook
-    logger.info(f"📱 Webhook received - From: {From}, Body: {Body}, MessageSid: {MessageSid}")
+    # Rate limit webhook by IP
+    await webhook_rate_limiter.check(request, "twilio")
 
-    # Validate Twilio signature unless explicitly disabled (development only)
+    # Log incoming webhook (safe metadata only)
+    log_webhook_received("twilio", "whatsapp", MessageSid)
+
+    # Validate Twilio signature — mandatory in production, optional bypass in dev
+    if settings.ENVIRONMENT == "production" and not settings.TWILIO_VALIDATE_SIGNATURE:
+        logger.critical("🚨 CRITICAL: TWILIO_VALIDATE_SIGNATURE is false in production — rejecting webhook")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Signature validation is mandatory in production"
+        )
+
     if settings.TWILIO_VALIDATE_SIGNATURE:
         twilio_signature = request.headers.get("X-Twilio-Signature", "")
         url = str(request.url)

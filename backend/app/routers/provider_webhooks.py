@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Dict, Any
 from app.core.database import get_db
 from app.core.config import settings
@@ -7,6 +8,9 @@ from app.core.logging import logger
 from app.services.charge_service import ChargeService
 from app.integrations.mercado_pago import MercadoPagoService
 from app.utils.log_sanitizer import sanitize_webhook_data
+from app.utils.webhook_rate_limiter import webhook_rate_limiter
+from app.core.audit_logger import log_webhook_received, log_payment_confirmed
+from app.models.provider_event import ProviderEvent
 
 router = APIRouter(prefix="/provider-webhooks", tags=["Provider Webhooks"])
 
@@ -18,9 +22,11 @@ async def fake_webhook(
     db: AsyncSession = Depends(get_db)
 ):
     """Receive fake/sandbox provider events."""
+    await webhook_rate_limiter.check(request, "fake")
+
     try:
         payload = await request.json()
-        logger.info(f"Received fake provider webhook: {sanitize_webhook_data(payload)}")
+        log_webhook_received("fake", payload.get("event_type", "unknown"), payload.get("provider_charge_id"))
 
         service = ChargeService(db)
         charge = await service.process_webhook_payload("fake", payload)
@@ -93,7 +99,15 @@ async def mercado_pago_webhook(
 
     This endpoint is separate from the billing subscription webhook to keep
     charge flows isolated from subscription flows.
+
+    Security:
+    - Validates x-signature header when provider is mercado_pago
+    - Idempotent: duplicate events are not re-processed
+    - Rate limited per IP
+    - No sensitive payload data is logged
     """
+    await webhook_rate_limiter.check(request, "mercado_pago")
+
     try:
         body = await request.json()
         headers = dict(request.headers)
@@ -123,12 +137,40 @@ async def mercado_pago_webhook(
                 detail="Invalid webhook signature"
             )
 
-        logger.info(f"Received valid Mercado Pago provider webhook: {sanitize_webhook_data(body)}")
+        # Idempotency: check if this event was already processed
+        external_id = body.get("data", {}).get("id") or body.get("id")
+        if external_id:
+            existing = await db.execute(
+                select(ProviderEvent).where(
+                    ProviderEvent.provider == "mercado_pago",
+                    ProviderEvent.external_id == str(external_id),
+                    ProviderEvent.processed == True
+                ).limit(1)
+            )
+            if existing.scalar_one_or_none():
+                logger.info(f"Duplicate Mercado Pago webhook event external_id={external_id} — skipping")
+                return {"status": "duplicate", "detail": "Event already processed"}
+
+        log_webhook_received("mercado_pago", body.get("type", "unknown"), str(external_id) if external_id else None)
 
         service = ChargeService(db)
         charge = await service.process_webhook_payload("mercado_pago", body)
 
         if charge:
+            # Mark the event as processed for idempotency
+            events = await db.execute(
+                select(ProviderEvent).where(
+                    ProviderEvent.provider == "mercado_pago",
+                    ProviderEvent.external_id == str(external_id) if external_id else ""
+                )
+            )
+            from datetime import datetime, timezone
+            for event in events.scalars().all():
+                event.processed = True
+                event.processed_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            log_payment_confirmed(charge.user_id, charge.id, "mercado_pago")
             return {"status": "processed", "charge_id": charge.id}
         return {"status": "ignored"}
 

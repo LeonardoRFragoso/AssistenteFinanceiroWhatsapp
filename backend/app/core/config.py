@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     DEMO_USER_EMAIL: str = "demo@payflow.ai"
     DEMO_USER_PASSWORD: str = "PayFlowDemo123"
     
+    # Sentry (optional, disabled by default)
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+    
+    # User rate limiting (authenticated endpoints)
+    USER_RATE_LIMIT_ENABLED: bool = True
+    USER_RATE_LIMIT_CHARGES_PER_MINUTE: int = 20
+    USER_RATE_LIMIT_EXPORTS_PER_MINUTE: int = 10
+    USER_RATE_LIMIT_DEMO_RESET_PER_HOUR: int = 5
+    
+    # Webhook rate limiting
+    WEBHOOK_RATE_LIMIT_PER_MINUTE: int = 60
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

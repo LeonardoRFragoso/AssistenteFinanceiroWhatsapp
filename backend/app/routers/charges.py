@@ -16,6 +16,8 @@ from app.schemas.charge import (
 from app.services.charge_service import ChargeService
 from app.services.charge_reminder_service import ChargeReminderService
 from app.utils.dependencies import get_current_active_user
+from app.utils.user_rate_limiter import charges_limiter, exports_limiter
+from app.core.audit_logger import log_charge_created, log_export
 from app.models.user import User
 from app.models.charge import ChargeStatus
 from app.repositories.charge_repository import VALID_FILTER_STATUSES
@@ -46,6 +48,7 @@ async def run_charge_reminders(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
+    await charges_limiter.check(current_user.id, "reminders_run")
     if settings.ENVIRONMENT == "production":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -103,6 +106,7 @@ async def export_charges_csv(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
+    await exports_limiter.check(current_user.id, "export_csv")
     """Export the authenticated user's charges as a CSV file."""
     status = _validate_status(status)
     service = ChargeService(db)
@@ -156,6 +160,7 @@ async def export_charges_pdf(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
+    await exports_limiter.check(current_user.id, "export_pdf")
     """Export the authenticated user's charges as a PDF report."""
     status = _validate_status(status)
     from reportlab.lib.pagesizes import A4
@@ -345,8 +350,11 @@ async def create_charge(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
+    await charges_limiter.check(current_user.id, "create_charge")
     service = ChargeService(db)
-    return await service.create_charge(current_user.id, charge_data)
+    charge = await service.create_charge(current_user.id, charge_data)
+    log_charge_created(current_user.id, charge.id, charge.provider, str(charge.amount))
+    return charge
 
 
 @router.post("/{charge_id}/cancel", response_model=ChargeResponse)
@@ -355,6 +363,7 @@ async def cancel_charge(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
+    await charges_limiter.check(current_user.id, "cancel_charge")
     service = ChargeService(db)
     charge = await service.cancel_charge(charge_id, current_user.id)
     if not charge:

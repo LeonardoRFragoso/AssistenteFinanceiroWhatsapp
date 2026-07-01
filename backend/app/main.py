@@ -8,6 +8,7 @@ from app.routers import auth, transactions, reminders, reports, webhook, billing
 from app.utils.security_middleware import SecurityHeadersMiddleware, IPRateLimitMiddleware
 from app.core.config import settings
 from app.core.security_validator import validate_production_config
+from app.core.sentry import init_sentry
 
 
 @asynccontextmanager
@@ -17,6 +18,9 @@ async def lifespan(app: FastAPI):
     try:
         # Validate critical security configuration
         validate_production_config()
+        
+        # Initialize Sentry (optional, no-op if SENTRY_DSN is empty)
+        init_sentry()
         
         # Initialize database
         logger.info("Connecting to database...")

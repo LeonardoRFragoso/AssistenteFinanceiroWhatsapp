@@ -19,11 +19,18 @@ from app.models.user import User
 from app.models.subscription import Subscription
 from app.models.transaction import Transaction, TransactionType
 from app.models.payment_event import PaymentEvent
+from app.models.charge import Charge, ChargeStatus
+from app.models.provider_event import ProviderEvent
+from app.models.charge_reminder_log import ChargeReminderLog
+from app.models.charge_delivery_log import ChargeDeliveryLog
 from app.core.logging import logger
 from app.utils.dependencies import get_current_admin_user
 import re
+import time as time_module
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+_start_time = time_module.time()
 
 
 @router.get("/metrics", response_model=MetricsResponse)
@@ -363,4 +370,62 @@ async def fix_phone_numbers(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fixing phone numbers: {str(e)}"
+        )
+
+
+@router.get("/system-metrics")
+async def get_system_metrics(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Return system-level metrics: charges, webhooks, reminders, delivery logs.
+    No personal data or financial values per user are exposed.
+    """
+    try:
+        total_users = (await db.execute(select(func.count(User.id)))).scalar_one()
+
+        total_charges = (await db.execute(select(func.count(Charge.id)))).scalar_one()
+        paid_charges = (await db.execute(
+            select(func.count(Charge.id)).where(Charge.status == ChargeStatus.PAID)
+        )).scalar_one()
+        pending_charges = (await db.execute(
+            select(func.count(Charge.id)).where(Charge.status == ChargeStatus.PENDING)
+        )).scalar_one()
+
+        today = date.today()
+        overdue_charges = (await db.execute(
+            select(func.count(Charge.id)).where(
+                Charge.status == ChargeStatus.PENDING,
+                Charge.due_date < today
+            )
+        )).scalar_one()
+
+        total_provider_events = (await db.execute(select(func.count(ProviderEvent.id)))).scalar_one()
+        processed_events = (await db.execute(
+            select(func.count(ProviderEvent.id)).where(ProviderEvent.processed == True)
+        )).scalar_one()
+
+        total_reminders = (await db.execute(select(func.count(ChargeReminderLog.id)))).scalar_one()
+        total_delivery_logs = (await db.execute(select(func.count(ChargeDeliveryLog.id)))).scalar_one()
+
+        uptime_seconds = time_module.time() - _start_time
+
+        return {
+            "total_users": total_users,
+            "total_charges": total_charges,
+            "paid_charges": paid_charges,
+            "pending_charges": pending_charges,
+            "overdue_charges": overdue_charges,
+            "total_provider_events": total_provider_events,
+            "processed_provider_events": processed_events,
+            "total_reminders_sent": total_reminders,
+            "total_delivery_logs": total_delivery_logs,
+            "uptime_seconds": round(uptime_seconds, 2),
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting system metrics: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving system metrics"
         )
