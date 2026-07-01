@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
+from datetime import date
+import csv
+import io
 from app.core.database import get_db
 from app.core.config import settings
 from app.schemas.charge import ChargeCreate, ChargeResponse, ChargeListResponse, ChargeSummaryResponse
@@ -46,6 +50,56 @@ async def list_charges(
     service = ChargeService(db)
     charges = await service.get_user_charges(current_user.id, limit=limit, status=status)
     return ChargeListResponse(items=charges, total=len(charges))
+
+
+@router.get("/export.csv")
+async def export_charges_csv(
+    status: Optional[str] = Query(None, description="Filter by status: pending, paid, cancelled, overdue"),
+    start_date: Optional[date] = Query(None, description="Filter charges created after this date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="Filter charges created before this date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Export the authenticated user's charges as a CSV file."""
+    service = ChargeService(db)
+    charges = await service.get_user_charges(current_user.id, limit=10000, status=status)
+
+    if start_date:
+        charges = [c for c in charges if c.created_at.date() >= start_date]
+    if end_date:
+        charges = [c for c in charges if c.created_at.date() <= end_date]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id", "customer_name", "customer_phone", "amount", "description",
+        "status", "derived_status", "due_date", "paid_at", "created_at",
+        "payment_link"
+    ])
+
+    for c in charges:
+        derived = service.get_derived_status(c)
+        writer.writerow([
+            c.id,
+            c.customer_name,
+            c.customer_phone or "",
+            f"{float(c.amount):.2f}",
+            c.description or "",
+            c.status.value,
+            derived,
+            c.due_date.isoformat() if c.due_date else "",
+            c.paid_at.isoformat() if c.paid_at else "",
+            c.created_at.isoformat() if c.created_at else "",
+            c.payment_link or ""
+        ])
+
+    output.seek(0)
+    filename = f"charges_export_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @router.get("/{charge_id}", response_model=ChargeResponse)

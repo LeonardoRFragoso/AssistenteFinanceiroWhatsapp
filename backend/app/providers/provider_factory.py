@@ -25,6 +25,12 @@ def get_payment_provider(provider_name: Optional[str] = None) -> PaymentProvider
         return _PAYMENT_PROVIDER
 
     if provider_name == "mercado_pago":
+        if not settings.MERCADO_PAGO_ACCESS_TOKEN:
+            raise RuntimeError(
+                "PAYFLOW_PAYMENT_PROVIDER is set to 'mercado_pago' but "
+                "MERCADO_PAGO_ACCESS_TOKEN is not configured. "
+                "Set the token in .env or switch back to PAYFLOW_PAYMENT_PROVIDER=fake."
+            )
         logger.info("Using Mercado Pago payment provider")
         _PAYMENT_PROVIDER = MercadoPagoPaymentProvider()
     elif provider_name == "fake":

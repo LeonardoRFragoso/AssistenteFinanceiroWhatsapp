@@ -56,6 +56,10 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 - ✅ Cancelamento de cobranças via WhatsApp ("cancela a cobrança do João")
 - ✅ Notificação automática quando um pagamento é confirmado
 - ✅ Lembretes automáticos de vencimento e cobranças vencidas
+- ✅ Worker automático de lembretes via RQ (configurável, desativado por padrão)
+- ✅ Exportação de cobranças em CSV (com filtros por status e data)
+- ✅ Envio de link de pagamento para o cliente via WhatsApp (com confirmação)
+- ✅ Provider Mercado Pago sandbox (opcional, padrão continua fake)
 - ✅ IA que entende português informal
 
 ### Dashboard Web
@@ -68,6 +72,7 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 - ✅ Cards de resumo de cobranças (a receber, recebido, pendentes, vencidas)
 - ✅ Tabela de cobranças com filtros por status (todas, pendentes, pagas, vencidas, canceladas)
 - ✅ Copiar link de pagamento e cancelar cobranças pendentes diretamente do dashboard
+- ✅ Botão de exportação CSV de cobranças (respeita filtro atual)
 - ✅ Interface moderna e responsiva
 
 ## 🏗️ Arquitetura
@@ -76,7 +81,7 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 backend/
 ├── app/
 │   ├── core/           # Configurações, database, segurança
-│   ├── models/         # Modelos SQLAlchemy (User, Charge, PendingAction, ProviderEvent, ChargeReminderLog, etc.)
+│   ├── models/         # Modelos SQLAlchemy (User, Charge, PendingAction, ProviderEvent, ChargeReminderLog, ChargeDeliveryLog, etc.)
 │   ├── schemas/        # Schemas Pydantic
 │   ├── repositories/   # Camada de acesso a dados
 │   ├── services/       # Lógica de negócio (AIService, ChargeService, PendingActionService, ChargeReminderService)
@@ -221,6 +226,7 @@ Acesse a documentação interativa:
 - `GET /charges/{id}` - Detalhes de uma cobrança
 - `POST /charges/{id}/cancel` - Cancela uma cobrança pendente
 - `POST /charges/reminders/run` - Dispara lembretes de vencimento manualmente (dev apenas)
+- `GET /charges/export.csv` - Exporta cobranças do usuário em CSV (filtros por status, data inicial, data final)
 
 #### Campos do `GET /charges/summary`
 

@@ -5,7 +5,7 @@ import WhatsAppConnect from '../components/WhatsAppConnect';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download } from 'lucide-react';
 
 interface DashboardData {
   summary: {
@@ -106,6 +106,24 @@ export default function Dashboard() {
   const handleChargeFilterChange = (filter: string) => {
     setChargeFilter(filter);
     loadCharges(filter);
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const statusParam = chargeFilter !== 'all' ? chargeFilter : undefined;
+      const response = await chargesAPI.exportCSV(statusParam);
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `charges_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Erro ao exportar CSV. Tente novamente.');
+    }
   };
 
   const handleCopyLink = async (id: number, link: string) => {
@@ -517,6 +535,13 @@ export default function Dashboard() {
                   {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : f === 'paid' ? 'Pagas' : f === 'overdue' ? 'Vencidas' : 'Canceladas'}
                 </button>
               ))}
+              <button
+                onClick={handleExportCSV}
+                className="ml-2 px-3 py-1 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                Exportar CSV
+              </button>
             </div>
           </div>
           <div className="p-6">

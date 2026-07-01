@@ -87,6 +87,8 @@ export const chargesAPI = {
   create: (data: any) => api.post('/charges/', data),
   cancel: (id: number) => api.post(`/charges/${id}/cancel`),
   getSummary: () => api.get('/charges/summary'),
+  exportCSV: (status?: string) =>
+    api.get(`/charges/export.csv${status ? `?status=${status}` : ''}`, { responseType: 'blob' }),
 };
 
 export const adminAPI = {

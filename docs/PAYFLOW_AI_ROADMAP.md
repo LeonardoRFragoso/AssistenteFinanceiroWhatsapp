@@ -129,8 +129,11 @@ Para evitar operações financeiras reais acidentais:
 
 ## 5. Próximos Passos Imediatos
 
-1. Integrar Mercado Pago em sandbox com credenciais de teste reais.
-2. Implementar worker automático para lembretes (RQ/Celery).
-3. Adicionar exportação de relatórios de cobranças (CSV/PDF).
+1. ~~Integrar Mercado Pago em sandbox com credenciais de teste reais.~~ ✅ Sprint 3
+2. ~~Implementar worker automático para lembretes (RQ/Celery).~~ ✅ Sprint 3
+3. ~~Adicionar exportação de relatórios de cobranças (CSV/PDF).~~ ✅ Sprint 3 (CSV)
 4. Implementar paginação no dashboard de cobranças.
 5. Adicionar testes de integração para endpoints REST de cobranças.
+6. Implementar exportação PDF de cobranças.
+7. Adicionar dashboard de analytics de cobranças (taxa de conversão, tempo médio de pagamento).
+8. Integrar RQ Scheduler para agendamento production-ready de lembretes.

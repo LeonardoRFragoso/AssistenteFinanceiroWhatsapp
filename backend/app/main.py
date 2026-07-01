@@ -27,6 +27,10 @@ async def lifespan(app: FastAPI):
         # Initialize Redis (optional)
         await init_redis()
         
+        # Start charge reminder scheduler (optional, disabled by default)
+        from app.jobs.reminder_scheduler import scheduler
+        scheduler.start()
+        
         logger.info("Application started successfully")
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
@@ -36,6 +40,8 @@ async def lifespan(app: FastAPI):
     
     logger.info("Shutting down application...")
     try:
+        from app.jobs.reminder_scheduler import scheduler
+        scheduler.stop()
         await close_redis()
         await engine.dispose()
     except Exception as e:

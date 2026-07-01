@@ -34,6 +34,7 @@ INTENTS POSSÍVEIS:
 - list_paid_charges: Usuário quer listar apenas cobranças pagas
 - check_charge_status: Usuário quer saber se uma cobrança específica foi paga
 - cancel_charge: Usuário quer cancelar uma cobrança já criada (ex: "cancela a cobrança do João", "cancela a última cobrança")
+- send_charge_link: Usuário quer enviar o link de pagamento para o cliente (ex: "envia o link para o cliente", "manda o link para ele", "sim, envia")
 - help: Usuário precisa de ajuda ou não entendeu
 
 EXTRAÇÃO DE ENTIDADES:

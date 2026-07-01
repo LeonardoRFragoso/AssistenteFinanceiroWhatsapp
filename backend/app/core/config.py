@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     
     ENABLE_WORKER: bool = True
+    ENABLE_CHARGE_REMINDER_WORKER: bool = False
+    CHARGE_REMINDER_INTERVAL_MINUTES: int = 60
     
     # Admin access (comma-separated emails)
     ADMIN_EMAILS: str = ""

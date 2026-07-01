@@ -2,7 +2,7 @@ import pytest_asyncio
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.core.database import Base
-from app.models import User, Charge, PendingAction, ProviderEvent, ChargeReminderLog
+from app.models import User, Charge, PendingAction, ProviderEvent, ChargeReminderLog, ChargeDeliveryLog
 from app.models.transaction import Transaction
 from app.models.reminder import Reminder
 from app.models.subscription import Subscription

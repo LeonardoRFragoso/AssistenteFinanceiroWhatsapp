@@ -16,7 +16,8 @@ if __name__ == '__main__':
     queues = [
         Queue('whatsapp', connection=redis_conn),
         Queue('insights', connection=redis_conn),
-        Queue('notifications', connection=redis_conn)
+        Queue('notifications', connection=redis_conn),
+        Queue('charge_reminders', connection=redis_conn)
     ]
     
     worker = Worker(queues, connection=redis_conn)

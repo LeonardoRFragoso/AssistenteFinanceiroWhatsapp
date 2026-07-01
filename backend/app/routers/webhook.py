@@ -270,6 +270,9 @@ async def process_intent(
         elif intent == "cancel_charge":
             return await handle_cancel_charge(user_id, entities, db, ai_service, context)
 
+        elif intent == "send_charge_link":
+            return await handle_send_charge_link(user_id, entities, db, ai_service, context)
+
         elif intent == "check_charge_status":
             return await handle_check_charge_status(user_id, entities, db, ai_service, context)
 
@@ -573,6 +576,10 @@ async def handle_confirm_pending_action(
         if charge.payment_link:
             message += f"🔗 Link de pagamento: {charge.payment_link}\n"
         message += "\nVou te avisar assim que o pagamento for confirmado. 🔔"
+
+        if charge.customer_phone:
+            message += f"\n\n📱 O cliente tem telefone cadastrado ({charge.customer_phone}). Deseja que eu envie o link de pagamento para ele pelo WhatsApp? Responda *sim* ou *não*."
+
         return message
 
     except Exception as e:
@@ -742,6 +749,47 @@ async def handle_cancel_charge(
     except Exception as e:
         logger.error(f"Error cancelling charge: {str(e)}")
         return "Erro ao cancelar cobrança. Tente novamente."
+
+
+async def handle_send_charge_link(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.charge_delivery_service import ChargeDeliveryService
+
+        charge_service = ChargeService(db)
+        charge = await charge_service.get_latest_charge(user_id)
+
+        if not charge:
+            return "Você ainda não tem cobranças para enviar o link."
+
+        if not charge.customer_phone:
+            return "A cobrança mais recente não tem telefone do cliente cadastrado. Não é possível enviar o link."
+
+        delivery_service = ChargeDeliveryService(db)
+        result = await delivery_service.send_charge_link_to_customer(charge, user_id)
+
+        if result["success"]:
+            if result.get("simulated"):
+                return (
+                    f"📱 *Link enviado (simulado)*\n\n"
+                    f"O link de pagamento foi simulado para {charge.customer_phone}.\n"
+                    f"(Twilio não configurado — em produção, a mensagem seria enviada.)"
+                )
+            return (
+                f"📱 *Link enviado com sucesso!*\n\n"
+                f"O link de pagamento de R$ {float(charge.amount):.2f} foi enviado para "
+                f"{charge.customer_name} ({charge.customer_phone})."
+            )
+        return f"❌ Não consegui enviar o link: {result['message']}"
+
+    except Exception as e:
+        logger.error(f"Error sending charge link: {str(e)}")
+        return "Erro ao enviar link de pagamento. Tente novamente."
 
 
 async def handle_check_charge_status(
