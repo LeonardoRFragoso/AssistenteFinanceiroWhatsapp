@@ -16,7 +16,7 @@ from app.models.pending_action import PendingAction
 from app.main import app
 from app.providers.provider_factory import get_payment_provider
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 import app.providers.provider_factory as factory_module
 
 
@@ -518,3 +518,316 @@ class TestFakeWebhook:
     async def test_simulate_payment_not_found(self, client):
         resp = await client.post("/provider-webhooks/fake/pay/nonexistent")
         assert resp.status_code == 404
+
+
+class TestDerivedStatusFilters:
+    @pytest.mark.asyncio
+    async def test_status_overdue_returns_only_overdue(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Overdue Charge",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_ov1",
+            payment_link="http://ov1",
+            status=ChargeStatus.PENDING,
+            due_date=today - timedelta(days=5),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending Not Overdue",
+            amount=Decimal("50.00"),
+            provider="fake",
+            provider_charge_id="fake_ov2",
+            payment_link="http://ov2",
+            status=ChargeStatus.PENDING,
+            due_date=today + timedelta(days=5),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending No Due Date",
+            amount=Decimal("30.00"),
+            provider="fake",
+            provider_charge_id="fake_ov3",
+            payment_link="http://ov3",
+            status=ChargeStatus.PENDING,
+            due_date=None,
+        ))
+        await test_session.commit()
+
+        resp = await client.get("/charges?status=overdue", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["customer_name"] == "Overdue Charge"
+
+    @pytest.mark.asyncio
+    async def test_status_pending_excludes_overdue(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Overdue Should Be Excluded",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_pe1",
+            payment_link="http://pe1",
+            status=ChargeStatus.PENDING,
+            due_date=today - timedelta(days=5),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending With Future Due",
+            amount=Decimal("50.00"),
+            provider="fake",
+            provider_charge_id="fake_pe2",
+            payment_link="http://pe2",
+            status=ChargeStatus.PENDING,
+            due_date=today + timedelta(days=5),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending No Due Date",
+            amount=Decimal("30.00"),
+            provider="fake",
+            provider_charge_id="fake_pe3",
+            payment_link="http://pe3",
+            status=ChargeStatus.PENDING,
+            due_date=None,
+        ))
+        await test_session.commit()
+
+        resp = await client.get("/charges?status=pending", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        names = {item["customer_name"] for item in data["items"]}
+        assert "Overdue Should Be Excluded" not in names
+        assert "Pending With Future Due" in names
+        assert "Pending No Due Date" in names
+
+    @pytest.mark.asyncio
+    async def test_status_cancelled_returns_cancelled(self, client, auth_headers, authed_user, test_session):
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Cancelled One",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_c1",
+            payment_link="http://c1",
+            status=ChargeStatus.CANCELLED,
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending One",
+            amount=Decimal("50.00"),
+            provider="fake",
+            provider_charge_id="fake_c2",
+            payment_link="http://c2",
+            status=ChargeStatus.PENDING,
+        ))
+        await test_session.commit()
+
+        resp = await client.get("/charges?status=cancelled", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["customer_name"] == "Cancelled One"
+
+    @pytest.mark.asyncio
+    async def test_invalid_status_returns_400(self, client, auth_headers):
+        resp = await client.get("/charges?status=invalid_status", headers=auth_headers)
+        assert resp.status_code == 400
+        assert "invalid_status" in resp.json()["detail"].lower()
+
+
+class TestDateRangeInclusivity:
+    @pytest.mark.asyncio
+    async def test_end_date_includes_full_day(self, client, auth_headers, authed_user, test_session):
+        end_date = date.today() - timedelta(days=1)
+        start_of_day = datetime.combine(end_date, time.min)
+        mid_day = datetime.combine(end_date, time(12, 30, 0))
+        end_of_day = datetime.combine(end_date, time.max)
+
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Start Of Day",
+            amount=Decimal("10.00"),
+            provider="fake",
+            provider_charge_id="fake_d1",
+            payment_link="http://d1",
+            status=ChargeStatus.PENDING,
+            created_at=start_of_day,
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Mid Day",
+            amount=Decimal("20.00"),
+            provider="fake",
+            provider_charge_id="fake_d2",
+            payment_link="http://d2",
+            status=ChargeStatus.PENDING,
+            created_at=mid_day,
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="End Of Day",
+            amount=Decimal("30.00"),
+            provider="fake",
+            provider_charge_id="fake_d3",
+            payment_link="http://d3",
+            status=ChargeStatus.PENDING,
+            created_at=end_of_day,
+        ))
+        await test_session.commit()
+
+        resp = await client.get(
+            f"/charges?start_date={end_date.isoformat()}&end_date={end_date.isoformat()}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+        names = {item["customer_name"] for item in data["items"]}
+        assert names == {"Start Of Day", "Mid Day", "End Of Day"}
+
+    @pytest.mark.asyncio
+    async def test_date_range_excludes_outside(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        two_days_ago = today - timedelta(days=2)
+
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Before Range",
+            amount=Decimal("10.00"),
+            provider="fake",
+            provider_charge_id="fake_dr1",
+            payment_link="http://dr1",
+            status=ChargeStatus.PENDING,
+            created_at=datetime.combine(two_days_ago, time(12, 0, 0)),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="In Range",
+            amount=Decimal("20.00"),
+            provider="fake",
+            provider_charge_id="fake_dr2",
+            payment_link="http://dr2",
+            status=ChargeStatus.PENDING,
+            created_at=datetime.combine(yesterday, time(12, 0, 0)),
+        ))
+        await test_session.commit()
+
+        resp = await client.get(
+            f"/charges?start_date={yesterday.isoformat()}&end_date={today.isoformat()}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["customer_name"] == "In Range"
+
+
+class TestExportWithDerivedStatus:
+    @pytest.mark.asyncio
+    async def test_csv_overdue_returns_only_overdue(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Overdue For CSV",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_csv_ov",
+            payment_link="http://csv_ov",
+            status=ChargeStatus.PENDING,
+            due_date=today - timedelta(days=5),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending For CSV",
+            amount=Decimal("50.00"),
+            provider="fake",
+            provider_charge_id="fake_csv_p",
+            payment_link="http://csv_p",
+            status=ChargeStatus.PENDING,
+            due_date=today + timedelta(days=5),
+        ))
+        await test_session.commit()
+
+        resp = await client.get("/charges/export.csv?status=overdue", headers=auth_headers)
+        assert resp.status_code == 200
+        content = resp.text
+        assert "Overdue For CSV" in content
+        assert "Pending For CSV" not in content
+
+    @pytest.mark.asyncio
+    async def test_csv_pending_excludes_overdue(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Overdue Excluded",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_csv_peo",
+            payment_link="http://csv_peo",
+            status=ChargeStatus.PENDING,
+            due_date=today - timedelta(days=5),
+        ))
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Pending Included",
+            amount=Decimal("50.00"),
+            provider="fake",
+            provider_charge_id="fake_csv_pei",
+            payment_link="http://csv_pei",
+            status=ChargeStatus.PENDING,
+            due_date=today + timedelta(days=5),
+        ))
+        await test_session.commit()
+
+        resp = await client.get("/charges/export.csv?status=pending", headers=auth_headers)
+        assert resp.status_code == 200
+        content = resp.text
+        assert "Pending Included" in content
+        assert "Overdue Excluded" not in content
+
+    @pytest.mark.asyncio
+    async def test_pdf_overdue_returns_200(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Overdue For PDF",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_pdf_ov",
+            payment_link="http://pdf_ov",
+            status=ChargeStatus.PENDING,
+            due_date=today - timedelta(days=5),
+        ))
+        await test_session.commit()
+
+        resp = await client.get("/charges/export.pdf?status=overdue", headers=auth_headers)
+        assert resp.status_code == 200
+        assert "application/pdf" in resp.headers.get("content-type", "")
+
+    @pytest.mark.asyncio
+    async def test_pdf_with_date_range_returns_200(self, client, auth_headers, authed_user, test_session):
+        today = date.today()
+        test_session.add(Charge(
+            user_id=authed_user.id,
+            customer_name="Date Range PDF",
+            amount=Decimal("100.00"),
+            provider="fake",
+            provider_charge_id="fake_pdf_dr",
+            payment_link="http://pdf_dr",
+            status=ChargeStatus.PENDING,
+        ))
+        await test_session.commit()
+
+        resp = await client.get(
+            f"/charges/export.pdf?start_date={today.isoformat()}&end_date={today.isoformat()}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert "application/pdf" in resp.headers.get("content-type", "")

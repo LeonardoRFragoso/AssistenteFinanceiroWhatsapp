@@ -122,7 +122,7 @@ export default function Dashboard() {
     setChargesLoading(true);
     setChargesError('');
     try {
-      const statusParam = filter === 'all' ? undefined : filter === 'overdue' ? 'pending' : filter;
+      const statusParam = filter === 'all' ? undefined : filter;
       const res = await chargesAPI.getPaginated(page, chargePageSize, statusParam, search || undefined);
       setCharges(res.data?.items || []);
       setChargeTotal(res.data?.total || 0);

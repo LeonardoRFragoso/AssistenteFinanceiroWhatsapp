@@ -252,6 +252,28 @@ Acesse a documentação interativa:
 
 > **Regra:** cobranças vencidas não entram em `total_pending` ou `count_pending`. O card "A Receber" do dashboard usa `total_receivable` para mostrar o total completo (pendentes + vencidas).
 
+#### Filtros de Status (Listagem, CSV e PDF)
+
+O parâmetro `status` aceita os seguintes valores:
+
+| Valor | Descrição | Regra de Filtro |
+| --- | --- | --- |
+| `pending` | Pendentes não vencidas | `status = PENDING AND (due_date IS NULL OR due_date >= today)` |
+| `overdue` | Vencidas (status derivado) | `status = PENDING AND due_date IS NOT NULL AND due_date < today` |
+| `paid` | Pagas | `status = PAID` |
+| `cancelled` | Canceladas | `status = CANCELLED` |
+| `expired` | Expiradas | `status = EXPIRED` |
+| `failed` | Falhadas | `status = FAILED` |
+
+> **Importante:**
+> - `overdue` não é um valor real do enum `ChargeStatus` — é um **status derivado**. Uma cobrança vencida permanece como `pending` no banco, mas com `due_date < hoje`.
+> - `pending` **não inclui** cobranças vencidas. Para ver todas as pendentes (incluindo vencidas), não use filtro de status.
+> - `receivable = pending + overdue` (total a receber).
+> - Status inválido retorna **HTTP 400** com mensagem de erro.
+> - Os endpoints `GET /charges/export.csv` e `GET /charges/export.pdf` usam **a mesma lógica de filtros** da listagem.
+> - Filtros de data (`start_date`, `end_date`) são **inclusivos** — `start_date` começa às 00:00:00 e `end_date` vai até 23:59:59.999999.
+> - `GET /charges/analytics` é uma **visão global** do usuário — não aceita filtros de status, data ou busca.
+
 ### Webhooks de Provedores
 
 - `POST /provider-webhooks/fake` - Recebe eventos do provedor fake (sandbox)

@@ -18,8 +18,18 @@ from app.services.charge_reminder_service import ChargeReminderService
 from app.utils.dependencies import get_current_active_user
 from app.models.user import User
 from app.models.charge import ChargeStatus
+from app.repositories.charge_repository import VALID_FILTER_STATUSES
 
 router = APIRouter(prefix="/charges", tags=["Charges"])
+
+
+def _validate_status(status: Optional[str]) -> Optional[str]:
+    if status is not None and status not in VALID_FILTER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{status}'. Valid values: {', '.join(sorted(VALID_FILTER_STATUSES))}"
+        )
+    return status
 
 
 @router.get("/summary", response_model=ChargeSummaryResponse)
@@ -48,18 +58,19 @@ async def run_charge_reminders(
 
 @router.get("", response_model=PaginatedChargeListResponse)
 async def list_charges(
-    status: Optional[str] = Query(None, description="Filter by status: pending, paid, cancelled"),
+    status: Optional[str] = Query(None, description="Filter by status: pending, overdue, paid, cancelled, expired, failed"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by customer name or description"),
-    start_date: Optional[date] = Query(None, description="Filter charges created after this date"),
-    end_date: Optional[date] = Query(None, description="Filter charges created before this date"),
+    start_date: Optional[date] = Query(None, description="Filter charges created from this date (inclusive)"),
+    end_date: Optional[date] = Query(None, description="Filter charges created up to this date (inclusive)"),
     sort_by: str = Query("created_at", description="Sort field: created_at, due_date, amount, status"),
     sort_order: str = Query("desc", description="Sort order: asc or desc"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Legacy limit param (backward compat)"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
+    status = _validate_status(status)
     service = ChargeService(db)
 
     # Backward compat: if limit is provided, use old non-paginated path
@@ -85,14 +96,15 @@ async def list_charges(
 
 @router.get("/export.csv")
 async def export_charges_csv(
-    status: Optional[str] = Query(None, description="Filter by status: pending, paid, cancelled, overdue"),
-    start_date: Optional[date] = Query(None, description="Filter charges created after this date (YYYY-MM-DD)"),
-    end_date: Optional[date] = Query(None, description="Filter charges created before this date (YYYY-MM-DD)"),
+    status: Optional[str] = Query(None, description="Filter by status: pending, overdue, paid, cancelled, expired, failed"),
+    start_date: Optional[date] = Query(None, description="Filter charges created from this date (inclusive)"),
+    end_date: Optional[date] = Query(None, description="Filter charges created up to this date (inclusive)"),
     search: Optional[str] = Query(None, description="Search by customer name or description"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Export the authenticated user's charges as a CSV file."""
+    status = _validate_status(status)
     service = ChargeService(db)
     result = await service.get_charges_paginated(
         user_id=current_user.id,
@@ -137,14 +149,15 @@ async def export_charges_csv(
 
 @router.get("/export.pdf")
 async def export_charges_pdf(
-    status: Optional[str] = Query(None, description="Filter by status: pending, paid, cancelled, overdue"),
-    start_date: Optional[date] = Query(None, description="Filter charges created after this date"),
-    end_date: Optional[date] = Query(None, description="Filter charges created before this date"),
+    status: Optional[str] = Query(None, description="Filter by status: pending, overdue, paid, cancelled, expired, failed"),
+    start_date: Optional[date] = Query(None, description="Filter charges created from this date (inclusive)"),
+    end_date: Optional[date] = Query(None, description="Filter charges created up to this date (inclusive)"),
     search: Optional[str] = Query(None, description="Search by customer name or description"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Export the authenticated user's charges as a PDF report."""
+    status = _validate_status(status)
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
@@ -251,6 +264,9 @@ async def get_charge_analytics(
     db: AsyncSession = Depends(get_db)
 ):
     """Return analytics metrics for the authenticated user's charges.
+
+    This is a global view of the user's charges — no status, date, or search
+    filters are applied. All charges ever created by the user are included.
 
     conversion_rate = paid / (created - cancelled)
     overdue_rate = overdue / (pending + overdue)

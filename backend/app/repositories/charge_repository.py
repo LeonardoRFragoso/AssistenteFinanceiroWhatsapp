@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, desc, asc, func, case
 from typing import List, Optional, Tuple
 from decimal import Decimal
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from app.models.charge import Charge, ChargeStatus
 
 
@@ -12,6 +12,46 @@ VALID_SORT_FIELDS = {
     "amount": Charge.amount,
     "status": Charge.status,
 }
+
+VALID_FILTER_STATUSES = {"pending", "overdue", "paid", "cancelled", "expired", "failed"}
+
+
+def _build_status_condition(status: str):
+    """Build a SQLAlchemy filter condition for a status, including derived statuses.
+
+    - pending:  status == PENDING AND (due_date IS NULL OR due_date >= today)
+    - overdue:  status == PENDING AND due_date IS NOT NULL AND due_date < today
+    - paid:     status == PAID
+    - cancelled: status == CANCELLED
+    - expired:  status == EXPIRED
+    - failed:   status == FAILED
+    """
+    today = date.today()
+
+    if status == "overdue":
+        return and_(
+            Charge.status == ChargeStatus.PENDING,
+            Charge.due_date.isnot(None),
+            Charge.due_date < today,
+        )
+
+    if status == "pending":
+        return and_(
+            Charge.status == ChargeStatus.PENDING,
+            or_(Charge.due_date.is_(None), Charge.due_date >= today),
+        )
+
+    status_map = {
+        "paid": ChargeStatus.PAID,
+        "cancelled": ChargeStatus.CANCELLED,
+        "expired": ChargeStatus.EXPIRED,
+        "failed": ChargeStatus.FAILED,
+    }
+    enum_val = status_map.get(status)
+    if enum_val is not None:
+        return Charge.status == enum_val
+
+    return None
 
 
 class ChargeRepository:
@@ -68,7 +108,9 @@ class ChargeRepository:
     async def get_by_user(self, user_id: int, limit: int = 50, status: Optional[str] = None) -> List[Charge]:
         query = select(Charge).where(Charge.user_id == user_id)
         if status:
-            query = query.where(Charge.status == status)
+            status_cond = _build_status_condition(status)
+            if status_cond is not None:
+                query = query.where(status_cond)
         query = query.order_by(desc(Charge.created_at)).limit(limit)
         result = await self.db.execute(query)
         return list(result.scalars().all())
@@ -303,13 +345,23 @@ class ChargeRepository:
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> Tuple[List[Charge], int]:
-        """Return a paginated list of charges for a user with filters and sorting."""
+        """Return a paginated list of charges for a user with filters and sorting.
+
+        Status filter supports derived statuses:
+        - pending:  PENDING with due_date null or >= today
+        - overdue:  PENDING with due_date < today
+        - paid, cancelled, expired, failed: direct enum match
+
+        Date range is inclusive: start_date covers from 00:00:00, end_date covers until 23:59:59.999999.
+        """
         query = select(Charge).where(Charge.user_id == user_id)
         count_query = select(func.count(Charge.id)).where(Charge.user_id == user_id)
 
         if status:
-            query = query.where(Charge.status == status)
-            count_query = count_query.where(Charge.status == status)
+            status_cond = _build_status_condition(status)
+            if status_cond is not None:
+                query = query.where(status_cond)
+                count_query = count_query.where(status_cond)
 
         if search:
             pattern = f"%{search}%"
@@ -321,12 +373,14 @@ class ChargeRepository:
             count_query = count_query.where(search_cond)
 
         if start_date:
-            query = query.where(Charge.created_at >= start_date)
-            count_query = count_query.where(Charge.created_at >= start_date)
+            start_dt = datetime.combine(start_date, time.min)
+            query = query.where(Charge.created_at >= start_dt)
+            count_query = count_query.where(Charge.created_at >= start_dt)
 
         if end_date:
-            query = query.where(Charge.created_at <= end_date)
-            count_query = count_query.where(Charge.created_at <= end_date)
+            end_dt = datetime.combine(end_date, time.max)
+            query = query.where(Charge.created_at <= end_dt)
+            count_query = count_query.where(Charge.created_at <= end_dt)
 
         sort_col = VALID_SORT_FIELDS.get(sort_by, Charge.created_at)
         if sort_order == "asc":
