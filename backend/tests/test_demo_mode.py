@@ -205,10 +205,12 @@ class TestDemoReset:
             mock_settings.ENABLE_DEMO_MODE = True
             mock_settings.DEMO_USER_EMAIL = settings.DEMO_USER_EMAIL
             mock_settings.DEMO_USER_PASSWORD = settings.DEMO_USER_PASSWORD
+            mock_settings.PAYFLOW_PAYMENT_PROVIDER = 'fake'
             mock_svc_settings.ENVIRONMENT = 'development'
             mock_svc_settings.ENABLE_DEMO_MODE = True
             mock_svc_settings.DEMO_USER_EMAIL = settings.DEMO_USER_EMAIL
             mock_svc_settings.DEMO_USER_PASSWORD = settings.DEMO_USER_PASSWORD
+            mock_svc_settings.PAYFLOW_PAYMENT_PROVIDER = 'fake'
             resp = await client.post("/demo/reset", headers=auth_headers)
             assert resp.status_code == 200
             data = resp.json()
@@ -265,3 +267,117 @@ class TestDemoUserIsolation:
         names = {item["customer_name"] for item in data["items"]}
         assert "Demo Charge" in names
         assert "My Private Charge" not in names
+
+
+class TestDemoModeStartupValidation:
+    @pytest.mark.asyncio
+    async def test_demo_mode_fails_in_production(self):
+        from app.core.security_validator import validate_demo_mode
+        from app.core.config import settings
+
+        with patch('app.core.security_validator.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.ENVIRONMENT = "production"
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "fake"
+            with pytest.raises(SystemExit, match="1"):
+                validate_demo_mode()
+
+    @pytest.mark.asyncio
+    async def test_demo_mode_fails_with_non_fake_provider(self):
+        from app.core.security_validator import validate_demo_mode
+        from app.core.config import settings
+
+        with patch('app.core.security_validator.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.ENVIRONMENT = "development"
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "mercado_pago"
+            with pytest.raises(SystemExit, match="1"):
+                validate_demo_mode()
+
+    @pytest.mark.asyncio
+    async def test_demo_mode_passes_with_fake_provider_in_dev(self):
+        from app.core.security_validator import validate_demo_mode
+
+        with patch('app.core.security_validator.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.ENVIRONMENT = "development"
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "fake"
+            validate_demo_mode()
+
+    @pytest.mark.asyncio
+    async def test_demo_mode_skipped_when_disabled(self):
+        from app.core.security_validator import validate_demo_mode
+
+        with patch('app.core.security_validator.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = False
+            mock_s.ENVIRONMENT = "production"
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "mercado_pago"
+            validate_demo_mode()
+
+
+class TestProviderFactoryDemoEnforcement:
+    def test_factory_blocks_mercado_pago_in_demo_mode(self):
+        import app.providers.provider_factory as factory
+        from app.providers.provider_factory import get_payment_provider
+
+        factory._PAYMENT_PROVIDER = None
+
+        with patch('app.providers.provider_factory.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "mercado_pago"
+            mock_s.MERCADO_PAGO_ACCESS_TOKEN = "test-token"
+            with pytest.raises(RuntimeError, match="Demo mode requires PAYFLOW_PAYMENT_PROVIDER=fake"):
+                get_payment_provider("mercado_pago")
+
+    def test_factory_allows_fake_in_demo_mode(self):
+        import app.providers.provider_factory as factory
+        from app.providers.provider_factory import get_payment_provider
+        from app.providers.fake_provider import FakePaymentProvider
+
+        factory._PAYMENT_PROVIDER = None
+
+        with patch('app.providers.provider_factory.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "fake"
+            provider = get_payment_provider("fake")
+            assert isinstance(provider, FakePaymentProvider)
+
+        factory._PAYMENT_PROVIDER = None
+
+
+class TestDemoLoginProductionBlock:
+    @pytest.mark.asyncio
+    async def test_demo_login_blocked_in_production(self, client, test_session):
+        from app.core.config import settings
+        from app.core.security import get_password_hash
+
+        demo_user = User(
+            name="Demo User",
+            email=settings.DEMO_USER_EMAIL,
+            hashed_password=get_password_hash(settings.DEMO_USER_PASSWORD),
+            phone_number="+15555555555",
+        )
+        test_session.add(demo_user)
+        await test_session.flush()
+        sub = Subscription(user_id=demo_user.id, plan="pro", status="active")
+        test_session.add(sub)
+        await test_session.commit()
+
+        with patch('app.core.config.settings') as mock_s:
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.ENVIRONMENT = "production"
+            mock_s.DEMO_USER_EMAIL = settings.DEMO_USER_EMAIL
+            mock_s.ACCESS_TOKEN_EXPIRE_MINUTES = 30
+            resp = await client.post("/auth/demo-login")
+            assert resp.status_code == 403
+            assert "production" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_demo_reset_blocked_with_non_fake_provider(self, client, auth_headers):
+        with patch('app.routers.demo.settings') as mock_s:
+            mock_s.ENVIRONMENT = "development"
+            mock_s.ENABLE_DEMO_MODE = True
+            mock_s.PAYFLOW_PAYMENT_PROVIDER = "mercado_pago"
+            resp = await client.post("/demo/reset", headers=auth_headers)
+            assert resp.status_code == 403
+            assert "fake" in resp.json()["detail"].lower()

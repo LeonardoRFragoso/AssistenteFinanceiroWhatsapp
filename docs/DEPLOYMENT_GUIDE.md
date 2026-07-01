@@ -175,8 +175,12 @@ Only sandbox credentials. Never use production tokens in demo.
 
 ## Security Notes
 
-- Demo mode should **never** be enabled in production
-- Demo password is for local/portfolio use only
+- Demo mode should **never** be enabled in production — the app will fail at startup if `ENVIRONMENT=production` and `ENABLE_DEMO_MODE=true`
+- Demo mode **always** requires `PAYFLOW_PAYMENT_PROVIDER=fake` — the app will fail at startup if demo mode is active with a non-fake provider
+- Mercado Pago cannot be used when demo mode is active — the provider factory raises an error
+- Demo password is for local/portfolio use only — `DEMO_USER_PASSWORD` is a fallback for dev environments
+- `POST /auth/demo-login` returns 403 in production even if accidentally enabled
+- `POST /demo/reset` checks environment, demo mode flag, and provider before executing
 - No Pix Out, saque, conta digital, or BaaS is implemented
 - All charges via WhatsApp require explicit user confirmation
 - Secrets must be set via environment variables, never hardcoded

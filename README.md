@@ -33,6 +33,10 @@ Autônomos, MEIs e pequenos negócios precisam de uma forma simples de cobrar cl
 - **Sem Pix Out, sem saque, sem conta digital, sem BaaS, sem Open Finance**
 - Segredos via `.env`, nunca commitados
 - Demo mode desativado por padrão
+- **Demo mode nunca roda em produção** — app falha na inicialização se `ENVIRONMENT=production` e `ENABLE_DEMO_MODE=true`
+- **Demo mode exige provider fake** — app falha na inicialização se `ENABLE_DEMO_MODE=true` e `PAYFLOW_PAYMENT_PROVIDER != fake`
+- **Mercado Pago bloqueado em demo mode** — provider factory rejeita `mercado_pago` quando demo ativo
+- Credenciais demo são apenas para ambiente local/dev
 
 ### Como rodar demo
 

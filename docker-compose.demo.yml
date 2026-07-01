@@ -1,5 +1,9 @@
 version: '3.8'
 
+# Demo compose — LOCAL/PORTFOLIO DEMONSTRATION ONLY
+# Never use in production. Demo mode is enabled, provider is fake.
+# No real payment processing occurs.
+
 services:
   postgres:
     image: postgres:15-alpine

@@ -44,10 +44,35 @@ def validate_secret_key():
     logger.info("✅ SECRET_KEY validation passed")
 
 
+def validate_demo_mode():
+    """
+    Validates that demo mode is not used in production and that demo mode
+    always uses the fake payment provider.
+    Raises SystemExit if configuration is unsafe.
+    """
+    if not settings.ENABLE_DEMO_MODE:
+        return
+
+    if settings.ENVIRONMENT == "production":
+        logger.critical("🚨 CRITICAL SECURITY ERROR: ENABLE_DEMO_MODE cannot be true in production.")
+        logger.critical("Set ENABLE_DEMO_MODE=false or change ENVIRONMENT to development/demo.")
+        sys.exit(1)
+
+    if settings.PAYFLOW_PAYMENT_PROVIDER.lower().strip() != "fake":
+        logger.critical("🚨 CRITICAL SECURITY ERROR: Demo mode requires PAYFLOW_PAYMENT_PROVIDER=fake.")
+        logger.critical(f"Current provider: '{settings.PAYFLOW_PAYMENT_PROVIDER}'. Set PAYFLOW_PAYMENT_PROVIDER=fake.")
+        sys.exit(1)
+
+    logger.info("✅ Demo mode validation passed (fake provider, non-production)")
+
+
 def validate_production_config():
     """
     Validates critical production configuration.
     """
+    # Always validate demo mode safety (applies to all environments)
+    validate_demo_mode()
+
     # Only validate in production environment
     if settings.ENVIRONMENT != "production":
         logger.info("Skipping production validation in non-production environment")

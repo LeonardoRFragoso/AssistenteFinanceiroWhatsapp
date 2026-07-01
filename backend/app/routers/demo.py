@@ -13,7 +13,7 @@ async def reset_demo_data(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Reset demo user data. Only available in development or demo mode."""
+    """Reset demo user data. Only available in development or demo mode, never in production."""
     if settings.ENVIRONMENT == "production":
         raise HTTPException(
             status_code=403,
@@ -24,6 +24,13 @@ async def reset_demo_data(
         raise HTTPException(
             status_code=404,
             detail="Demo mode is not enabled"
+        )
+
+    # Defense in depth: verify provider is fake
+    if settings.PAYFLOW_PAYMENT_PROVIDER.lower().strip() != "fake":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo mode requires fake payment provider"
         )
 
     from app.services.demo_service import DemoService

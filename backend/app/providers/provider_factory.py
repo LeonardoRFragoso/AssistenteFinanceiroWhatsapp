@@ -25,6 +25,12 @@ def get_payment_provider(provider_name: Optional[str] = None) -> PaymentProvider
         return _PAYMENT_PROVIDER
 
     if provider_name == "mercado_pago":
+        if settings.ENABLE_DEMO_MODE:
+            raise RuntimeError(
+                "Demo mode is active but PAYFLOW_PAYMENT_PROVIDER is 'mercado_pago'. "
+                "Demo mode requires PAYFLOW_PAYMENT_PROVIDER=fake. "
+                "Set PAYFLOW_PAYMENT_PROVIDER=fake or disable demo mode."
+            )
         if not settings.MERCADO_PAGO_ACCESS_TOKEN:
             raise RuntimeError(
                 "PAYFLOW_PAYMENT_PROVIDER is set to 'mercado_pago' but "

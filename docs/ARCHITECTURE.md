@@ -179,11 +179,19 @@ This derived status is used consistently across:
 ## Demo Mode
 
 When `ENABLE_DEMO_MODE=true`:
-- `POST /auth/demo-login` — Login as demo user without password
-- `POST /demo/reset` — Reset demo data (non-production only)
-- Provider is forced to `fake`
+- `POST /auth/demo-login` — Login as demo user without password (blocked in production)
+- `POST /demo/reset` — Reset demo data (non-production only, requires fake provider)
 - Demo user has pre-seeded charges and transactions
 - Frontend shows "Entrar como Demo" button
+
+### Demo Mode Security
+
+- **Never enable demo mode in production**: The app fails at startup if `ENVIRONMENT=production` and `ENABLE_DEMO_MODE=true`
+- **Demo always uses fake provider**: The app fails at startup if `ENABLE_DEMO_MODE=true` and `PAYFLOW_PAYMENT_PROVIDER != fake`
+- **Provider factory blocks Mercado Pago**: `get_payment_provider("mercado_pago")` raises `RuntimeError` when demo mode is active
+- **demo-login blocked in production**: Returns HTTP 403 if `ENVIRONMENT=production`
+- **demo/reset defense in depth**: Checks environment, demo mode, and provider before resetting
+- **Credentials are local-only**: `DEMO_USER_PASSWORD` is a fallback for local/dev environments, not for public exposure
 
 ## Health & Readiness
 

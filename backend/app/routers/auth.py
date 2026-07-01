@@ -72,13 +72,19 @@ async def check_admin_status(
 async def demo_login(
     db: AsyncSession = Depends(get_db)
 ):
-    """Login as demo user. Only available when ENABLE_DEMO_MODE=true."""
+    """Login as demo user. Only available when ENABLE_DEMO_MODE=true and not in production."""
     from app.core.config import settings
 
     if not settings.ENABLE_DEMO_MODE:
         raise HTTPException(
             status_code=404,
             detail="Demo mode is not enabled"
+        )
+
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo login is not available in production"
         )
 
     auth_service = AuthService(db)
