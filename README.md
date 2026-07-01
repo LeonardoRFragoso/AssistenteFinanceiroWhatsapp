@@ -2,6 +2,78 @@
 
 Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. Utiliza inteligência artificial para processamento de linguagem natural, permitindo registrar despesas, receitas e criar cobranças com links de pagamento de forma segura.
 
+## Para avaliadores técnicos
+
+### Problema resolvido
+
+Autônomos, MEIs e pequenos negócios precisam de uma forma simples de cobrar clientes e acompanhar pagamentos. O PayFlow AI resolve isso permitindo criar cobranças, enviar links de pagamento e acompanhar recebimentos via WhatsApp — sem precisar de um app financeiro complexo.
+
+### Principais fluxos
+
+- **WhatsApp → IA → Cobrança**: Usuário envia mensagem natural, IA propõe cobrança, usuário confirma, sistema cria cobrança e envia link ao cliente
+- **Webhook → Pagamento**: Provider notifica pagamento, sistema atualiza status e notifica usuário via WhatsApp
+- **Lembretes**: Scheduler periódico identifica cobranças vencidas/próximas do vencimento e envia lembretes
+- **Dashboard**: Listagem paginada com filtros (status derivado, date range inclusivo), analytics, exportação CSV/PDF
+
+### Arquitetura
+
+- **Backend**: FastAPI async, SQLAlchemy 2.0, camadas (routers → services → repositories)
+- **Frontend**: Next.js + TypeScript + TailwindCSS
+- **Queue**: Redis + RQ para workers assíncronos
+- **IA**: OpenAI GPT-4o para NLP
+- **Mensageria**: Twilio WhatsApp Business API
+- Ver `docs/ARCHITECTURE.md` para detalhes completos
+
+### Decisões de segurança
+
+- Provider padrão é `fake` — nenhuma cobrança real é processada
+- Mercado Pago sandbox apenas com opt-in explícito
+- Confirmação explícita para todas as cobranças via WhatsApp
+- JWT auth, rate limiting, security headers
+- **Sem Pix Out, sem saque, sem conta digital, sem BaaS, sem Open Finance**
+- Segredos via `.env`, nunca commitados
+- Demo mode desativado por padrão
+
+### Como rodar demo
+
+```bash
+# Docker Compose demo (recomendado)
+docker-compose -f docker-compose.demo.yml up --build
+
+# Acesse:
+# Frontend: http://localhost:3001
+# Backend:  http://localhost:8001/docs
+# Login:    Clique em "Entrar como Demo"
+```
+
+### Como rodar testes
+
+```bash
+# Backend
+cd backend
+source .venv/bin/activate
+pytest -v tests
+
+# Frontend
+cd frontend
+npm run build
+```
+
+### Limitações conscientes
+
+- Não é uma instituição financeira
+- Não oferece conta digital, Pix Out, saque ou pagamento de boletos
+- Provider fake é o padrão (sandbox)
+- Twilio WhatsApp Sandbox requer código de join
+- OpenAI API key necessária para IA
+
+### Próximos passos
+
+- Testes E2E (Playwright)
+- Observabilidade (Sentry, métricas)
+- Multi-tenant
+- Integração com mais provedores de pagamento
+
 ## � Como Testar o WhatsApp
 
 **Número para iniciar conversa**: `+1 415 523 8886` (Twilio Sandbox)

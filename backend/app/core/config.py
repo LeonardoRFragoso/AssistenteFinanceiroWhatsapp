@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Admin access (comma-separated emails)
     ADMIN_EMAILS: str = ""
     
+    # Demo mode (disabled by default)
+    ENABLE_DEMO_MODE: bool = False
+    DEMO_USER_EMAIL: str = "demo@payflow.ai"
+    DEMO_USER_PASSWORD: str = "PayFlowDemo123"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

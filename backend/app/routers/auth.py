@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import timedelta
 from app.core.database import get_db
+from app.core.security import create_access_token
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
 from app.services.auth_service import AuthService
 from app.utils.dependencies import get_current_user
@@ -64,3 +66,31 @@ async def check_admin_status(
     is_admin = current_user.email in admin_emails
     
     return {"is_admin": is_admin}
+
+
+@router.post("/demo-login", response_model=Token)
+async def demo_login(
+    db: AsyncSession = Depends(get_db)
+):
+    """Login as demo user. Only available when ENABLE_DEMO_MODE=true."""
+    from app.core.config import settings
+
+    if not settings.ENABLE_DEMO_MODE:
+        raise HTTPException(
+            status_code=404,
+            detail="Demo mode is not enabled"
+        )
+
+    auth_service = AuthService(db)
+    user = await auth_service.user_repo.get_by_email(settings.DEMO_USER_EMAIL)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Demo user not found. Run seed_demo_data.py first."
+        )
+
+    access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    return Token(access_token=access_token)

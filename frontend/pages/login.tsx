@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { Mail, Lock, LogIn, Wallet, TrendingUp, Shield } from 'lucide-react';
+import { Mail, Lock, LogIn, Wallet, TrendingUp, Shield, Sparkles } from 'lucide-react';
 import { authAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
+
+const ENABLE_DEMO = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === 'true';
 
 export default function Login() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export default function Login() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +30,20 @@ export default function Login() {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError('');
+    setDemoLoading(true);
+    try {
+      const response = await authAPI.demoLogin();
+      localStorage.setItem('token', response.data.access_token);
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -128,6 +145,34 @@ export default function Login() {
               </button>
             </div>
           </form>
+
+          {ENABLE_DEMO && (
+            <div className="mt-4">
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800 mb-3">
+                <p className="text-xs text-amber-800 dark:text-amber-300 text-center">
+                  Modo Demo ativo — dados de demonstração
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDemoLogin}
+                disabled={demoLoading}
+                className="group relative w-full flex justify-center items-center gap-2 py-3 px-4 border border-amber-300 dark:border-amber-700 text-sm font-semibold rounded-xl text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {demoLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Entrando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    <span>Entrar como Demo</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Features */}
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
