@@ -81,10 +81,12 @@ export const billingAPI = {
 };
 
 export const chargesAPI = {
-  getAll: (limit = 50) => api.get(`/charges/?limit=${limit}`),
+  getAll: (limit = 50, status?: string) =>
+    api.get(`/charges/?limit=${limit}${status ? `&status=${status}` : ''}`),
   getById: (id: number) => api.get(`/charges/${id}`),
   create: (data: any) => api.post('/charges/', data),
   cancel: (id: number) => api.post(`/charges/${id}/cancel`),
+  getSummary: () => api.get('/charges/summary'),
 };
 
 export const adminAPI = {

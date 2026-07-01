@@ -65,7 +65,7 @@
 
 ## 3. Roadmap de Fases
 
-### Fase 1 - Fundações e "Create charge via WhatsApp" (Sprint Atual)
+### Fase 1 - Fundações e "Create charge via WhatsApp" (Concluída)
 
 Objetivo: implementar o primeiro fluxo transacional completo com segurança e sandbox.
 
@@ -81,13 +81,20 @@ Escopo:
 - Dashboard web com seção de cobranças recentes.
 - Documentação e testes mínimos.
 
-### Fase 2 - Aprofundamento Transacional
+### Fase 2 - Cobranças Inteligentes, Dashboard e Lembretes (Concluída)
 
-- Envio automático do link de pagamento para o cliente via WhatsApp.
-- Vencimento e lembretes de cobranças pendentes.
-- Suporte a múltiplos itens na mesma cobrança.
-- Relatório de receitas a receber / recebidas.
-- Filtros e paginação no dashboard de cobranças.
+Objetivo: transformar o fluxo de cobrança em uma experiência mais útil e validável para uso real.
+
+Escopo:
+- **Dashboard de cobranças:** cards de resumo (a receber, recebido, pendentes, vencidas), tabela com filtros (todas, pendentes, pagas, vencidas, canceladas), copiar link, botão cancelar.
+- **Estatísticas de cobranças:** endpoint `GET /charges/summary` com totais e contagens.
+- **Vencimento:** suporte a `due_date` em cobranças, com status derivado "overdue" para pendentes vencidas.
+- **Lembretes automáticos:** `ChargeReminderService` com modelo `ChargeReminderLog`, endpoint `POST /charges/reminders/run`, mensagens para vencimento próximo e vencidas, anti-duplicação diária.
+- **Listagem via WhatsApp:** intents `list_pending_charges`, `list_paid_charges` com resumo e totais.
+- **Cancelamento via WhatsApp:** intent `cancel_charge` com busca por nome, valor ou "última cobrança", bloqueio de cancelamento de cobranças pagas.
+- **Documentação:** `docs/WHATSAPP_CHARGE_FLOW_TEST.md`, `docs/MERCADO_PAGO_SANDBOX_SETUP.md`.
+- **Correções:** `datetime.utcnow()` → `datetime.now(timezone.utc)`, suporte a SQLite nos testes.
+- **Testes:** 36 testes cobrindo summary, due_date, overdue, filtros, cancel, reminders, intents.
 
 ### Fase 3 - Provedores e Compliance
 
@@ -95,6 +102,9 @@ Escopo:
 - Validação robusta de assinaturas de webhook.
 - Logs de auditoria e sanetização de dados sensíveis.
 - Suporte a boleto e cartão (apenas recebimento, nunca Pix Out).
+- Worker automático para lembretes (RQ/Celery).
+- Relatório de receitas a receber / recebidas com exportação.
+- Suporte a múltiplos itens na mesma cobrança.
 
 ### Fase 4 - Escalabilidade e Mercado
 
@@ -119,8 +129,8 @@ Para evitar operações financeiras reais acidentais:
 
 ## 5. Próximos Passos Imediatos
 
-1. Revisar as rotas de webhook e REST para garantir autenticação/validação corretas.
-2. Testar o fluxo completo: criação de cobrança → confirmação → pagamento fake → notificação.
-3. Rodar migrações Alembic no ambiente de desenvolvimento.
-4. Atualizar README com novas variáveis de ambiente e fluxo de cobranças.
-5. Adicionar testes de integração para os novos endpoints.
+1. Integrar Mercado Pago em sandbox com credenciais de teste reais.
+2. Implementar worker automático para lembretes (RQ/Celery).
+3. Adicionar exportação de relatórios de cobranças (CSV/PDF).
+4. Implementar paginação no dashboard de cobranças.
+5. Adicionar testes de integração para endpoints REST de cobranças.

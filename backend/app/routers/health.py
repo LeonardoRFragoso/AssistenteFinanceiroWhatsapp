@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core.redis import get_redis
 from app.core.config import settings
 from app.core.logging import logger
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 
 router = APIRouter(prefix="/health", tags=["Health"])
@@ -22,7 +22,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     """
     health_status = {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "checks": {}
     }
     
@@ -150,4 +150,4 @@ async def liveness_check():
     Liveness probe para Kubernetes
     Retorna 200 se o processo está vivo
     """
-    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}

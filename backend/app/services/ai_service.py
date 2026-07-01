@@ -30,7 +30,10 @@ INTENTS POSSÍVEIS:
 - confirm_pending_action: Usuário confirma uma ação pendente (ex: "confirmo", "sim", "pode gerar", "pode criar")
 - cancel_pending_action: Usuário cancela uma ação pendente (ex: "cancela", "não", "deixa pra lá", "desiste")
 - list_charges: Usuário quer listar cobranças criadas
+- list_pending_charges: Usuário quer listar apenas cobranças pendentes
+- list_paid_charges: Usuário quer listar apenas cobranças pagas
 - check_charge_status: Usuário quer saber se uma cobrança específica foi paga
+- cancel_charge: Usuário quer cancelar uma cobrança já criada (ex: "cancela a cobrança do João", "cancela a última cobrança")
 - help: Usuário precisa de ajuda ou não entendeu
 
 EXTRAÇÃO DE ENTIDADES:
@@ -64,6 +67,11 @@ Para lembretes, extraia:
 Para relatórios, extraia:
 - period (hoje, semana, mês, ano, ou datas específicas)
 - start_date e end_date se especificado
+
+Para cancel_charge, extraia:
+- customer_name (nome do cliente mencionado, se houver)
+- amount (valor mencionado, se houver)
+- reference: "latest" se o usuário disse "última cobrança", ou null
 
 IMPORTANTE:
 - Entenda português informal e gírias

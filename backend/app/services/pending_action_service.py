@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Optional, Dict, Any
 from app.models.pending_action import PendingAction, PendingActionStatus
@@ -26,7 +26,7 @@ class PendingActionService:
         due_date: Optional[str] = None
     ) -> PendingAction:
         """Create a pending action for charge creation."""
-        await self.action_repo.expire_old_actions(datetime.utcnow())
+        await self.action_repo.expire_old_actions(datetime.now(timezone.utc))
 
         payload = {
             "amount": amount,
@@ -36,7 +36,7 @@ class PendingActionService:
             "due_date": due_date
         }
 
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         action = await self.action_repo.create(
             user_id=user_id,
             action_type="create_charge",
@@ -48,7 +48,7 @@ class PendingActionService:
         return action
 
     async def get_pending_action(self, user_id: int, action_type: Optional[str] = None) -> Optional[PendingAction]:
-        await self.action_repo.expire_old_actions(datetime.utcnow())
+        await self.action_repo.expire_old_actions(datetime.now(timezone.utc))
         return await self.action_repo.get_latest_pending_by_user(user_id, action_type)
 
     async def confirm_and_execute(self, action_id: int, user_id: int) -> Optional[Charge]:

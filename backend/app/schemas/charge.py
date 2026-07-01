@@ -34,8 +34,9 @@ class ChargeResponse(BaseModel):
     qr_code: Optional[str]
     qr_code_base64: Optional[str]
     status: ChargeStatus
-    due_date: Optional[date]
-    paid_at: Optional[datetime]
+    derived_status: Optional[str] = None
+    due_date: Optional[date] = None
+    paid_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -46,3 +47,13 @@ class ChargeResponse(BaseModel):
 class ChargeListResponse(BaseModel):
     items: List[ChargeResponse]
     total: int
+
+
+class ChargeSummaryResponse(BaseModel):
+    total_pending: Decimal
+    total_paid: Decimal
+    total_overdue: Decimal
+    count_pending: int
+    count_paid: int
+    count_overdue: int
+    count_cancelled: int

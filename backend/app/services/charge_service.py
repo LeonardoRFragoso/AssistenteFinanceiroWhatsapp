@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 from app.models.charge import Charge, ChargeStatus
 from app.models.provider_event import ProviderEvent
@@ -8,7 +8,7 @@ from app.repositories.charge_repository import ChargeRepository
 from app.repositories.provider_event_repository import ProviderEventRepository
 from app.repositories.user_repository import UserRepository
 from app.providers.provider_factory import get_payment_provider
-from app.schemas.charge import ChargeCreate
+from app.schemas.charge import ChargeCreate, ChargeSummaryResponse
 from app.core.logging import logger
 from app.integrations.twilio_whatsapp import TwilioWhatsAppService
 
@@ -74,6 +74,37 @@ class ChargeService:
     async def cancel_charge(self, charge_id: int, user_id: int) -> Optional[Charge]:
         return await self.charge_repo.cancel(charge_id, user_id)
 
+    def get_derived_status(self, charge: Charge) -> str:
+        """Return the effective status of a charge, considering overdue."""
+        if charge.status == ChargeStatus.PENDING and charge.due_date:
+            if charge.due_date < date.today():
+                return "overdue"
+        return charge.status.value
+
+    async def get_summary(self, user_id: int) -> ChargeSummaryResponse:
+        """Get charge summary statistics for a user."""
+        data = await self.charge_repo.get_summary(user_id)
+        return ChargeSummaryResponse(**data)
+
+    async def get_pending_charges(self, user_id: int) -> List[Charge]:
+        return await self.charge_repo.get_pending_by_user(user_id)
+
+    async def get_paid_charges(self, user_id: int, limit: int = 10) -> List[Charge]:
+        return await self.charge_repo.get_paid_by_user(user_id, limit=limit)
+
+    async def get_overdue_charges(self, user_id: int) -> List[Charge]:
+        return await self.charge_repo.get_overdue_by_user(user_id)
+
+    async def find_charges_by_customer_name(self, user_id: int, name: str) -> List[Charge]:
+        return await self.charge_repo.find_by_customer_name(user_id, name)
+
+    async def find_charges_by_amount(self, user_id: int, amount: Decimal) -> List[Charge]:
+        return await self.charge_repo.find_by_amount(user_id, amount)
+
+    async def get_latest_charge(self, user_id: int) -> Optional[Charge]:
+        charges = await self.charge_repo.get_by_user(user_id, limit=1)
+        return charges[0] if charges else None
+
     async def process_payment_event(
         self,
         provider: str,
@@ -104,7 +135,7 @@ class ChargeService:
 
         if status == "paid" or status == "approved":
             charge.status = ChargeStatus.PAID
-            charge.paid_at = paid_at or datetime.utcnow()
+            charge.paid_at = paid_at or datetime.now(timezone.utc)
             await self.db.commit()
             await self.db.refresh(charge)
             logger.info(f"Charge {charge.id} marked as paid via {provider}")

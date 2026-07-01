@@ -50,8 +50,12 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 - ✅ Consulta de saldo e relatórios
 - ✅ Listagem de transações recentes
 - ✅ Criação de cobranças com confirmação explícita do usuário
-- ✅ Listagem e consulta de status de cobranças
+- ✅ Criação de cobranças com vencimento ("com vencimento amanhã", "vence dia 15")
+- ✅ Listagem de cobranças com resumo e totais
+- ✅ Filtro de cobranças por status (pendentes, pagas)
+- ✅ Cancelamento de cobranças via WhatsApp ("cancela a cobrança do João")
 - ✅ Notificação automática quando um pagamento é confirmado
+- ✅ Lembretes automáticos de vencimento e cobranças vencidas
 - ✅ IA que entende português informal
 
 ### Dashboard Web
@@ -61,7 +65,9 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 - ✅ Lista de transações recentes
 - ✅ Gerenciamento de lembretes
 - ✅ Relatórios mensais
-- ✅ Seção de cobranças com status, valor, cliente e link de pagamento
+- ✅ Cards de resumo de cobranças (a receber, recebido, pendentes, vencidas)
+- ✅ Tabela de cobranças com filtros por status (todas, pendentes, pagas, vencidas, canceladas)
+- ✅ Copiar link de pagamento e cancelar cobranças pendentes diretamente do dashboard
 - ✅ Interface moderna e responsiva
 
 ## 🏗️ Arquitetura
@@ -70,10 +76,10 @@ Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. 
 backend/
 ├── app/
 │   ├── core/           # Configurações, database, segurança
-│   ├── models/         # Modelos SQLAlchemy (User, Charge, PendingAction, ProviderEvent, etc.)
+│   ├── models/         # Modelos SQLAlchemy (User, Charge, PendingAction, ProviderEvent, ChargeReminderLog, etc.)
 │   ├── schemas/        # Schemas Pydantic
 │   ├── repositories/   # Camada de acesso a dados
-│   ├── services/       # Lógica de negócio (AIService, ChargeService, PendingActionService)
+│   ├── services/       # Lógica de negócio (AIService, ChargeService, PendingActionService, ChargeReminderService)
 │   ├── routers/        # Endpoints da API
 │   ├── providers/      # Camada desacoplada de provedores de pagamento (fake, mercado_pago)
 │   ├── integrations/   # Twilio, OpenAI, Mercado Pago
@@ -209,10 +215,12 @@ Acesse a documentação interativa:
 
 ### Endpoints de Cobrança (PayFlow AI)
 
-- `GET /charges` - Lista cobranças do usuário autenticado
+- `GET /charges` - Lista cobranças do usuário autenticado (filtros por status)
+- `GET /charges/summary` - Resumo estatístico (totais a receber, recebido, vencido, contagens)
 - `POST /charges` - Cria uma nova cobrança (gera link de pagamento no provedor configurado)
 - `GET /charges/{id}` - Detalhes de uma cobrança
 - `POST /charges/{id}/cancel` - Cancela uma cobrança pendente
+- `POST /charges/reminders/run` - Dispara lembretes de vencimento manualmente (dev apenas)
 
 ### Webhooks de Provedores
 

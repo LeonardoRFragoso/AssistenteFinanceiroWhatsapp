@@ -261,6 +261,15 @@ async def process_intent(
         elif intent == "list_charges":
             return await handle_list_charges(user_id, entities, db, ai_service, context)
 
+        elif intent == "list_pending_charges":
+            return await handle_list_pending_charges(user_id, entities, db, ai_service, context)
+
+        elif intent == "list_paid_charges":
+            return await handle_list_paid_charges(user_id, entities, db, ai_service, context)
+
+        elif intent == "cancel_charge":
+            return await handle_cancel_charge(user_id, entities, db, ai_service, context)
+
         elif intent == "check_charge_status":
             return await handle_check_charge_status(user_id, entities, db, ai_service, context)
 
@@ -601,22 +610,138 @@ async def handle_list_charges(
 ) -> str:
     try:
         charge_service = ChargeService(db)
-        charges = await charge_service.get_user_charges(user_id, limit=5)
+        charges = await charge_service.get_user_charges(user_id, limit=10)
 
         if not charges:
             return "Você ainda não tem cobranças criadas."
 
-        message = "📋 *Últimas cobranças:*\n\n"
-        for c in charges:
-            status_emoji = "✅" if c.status.value == "paid" else "⏳"
-            message += f"{status_emoji} R$ {float(c.amount):.2f} - {c.customer_name} ({c.status.value})\n"
+        message = "📋 *Suas últimas cobranças:*\n\n"
+        for i, c in enumerate(charges, 1):
+            derived = charge_service.get_derived_status(c)
+            status_label = {
+                "pending": "pendente",
+                "paid": "pago",
+                "overdue": "vencida",
+                "cancelled": "cancelada",
+                "expired": "expirada",
+                "failed": "falhou"
+            }.get(derived, derived)
+            message += f"{i}. {c.customer_name} — R$ {float(c.amount):.2f} — {status_label}\n"
 
-        message += "\nPara ver todas, acesse o dashboard web!"
+        summary = await charge_service.get_summary(user_id)
+        message += f"\n*Resumo:*\n"
+        message += f"A receber: R$ {float(summary.total_pending + summary.total_overdue):.2f}\n"
+        message += f"Recebido: R$ {float(summary.total_paid):.2f}"
+
         return message
 
     except Exception as e:
         logger.error(f"Error listing charges: {str(e)}")
         return "Erro ao listar cobranças. Tente novamente."
+
+
+async def handle_list_pending_charges(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        charge_service = ChargeService(db)
+        charges = await charge_service.get_pending_charges(user_id)
+
+        if not charges:
+            return "✅ Você não tem cobranças pendentes."
+
+        message = "⏳ *Cobranças pendentes:*\n\n"
+        for i, c in enumerate(charges, 1):
+            derived = charge_service.get_derived_status(c)
+            status_label = "vencida" if derived == "overdue" else "pendente"
+            due_str = c.due_date.strftime("%d/%m/%Y") if c.due_date else "sem vencimento"
+            message += f"{i}. {c.customer_name} — R$ {float(c.amount):.2f} — {status_label} (vence: {due_str})\n"
+
+        return message
+
+    except Exception as e:
+        logger.error(f"Error listing pending charges: {str(e)}")
+        return "Erro ao listar cobranças pendentes. Tente novamente."
+
+
+async def handle_list_paid_charges(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        charge_service = ChargeService(db)
+        charges = await charge_service.get_paid_charges(user_id, limit=10)
+
+        if not charges:
+            return "Você ainda não tem cobranças pagas."
+
+        message = "✅ *Cobranças pagas:*\n\n"
+        for i, c in enumerate(charges, 1):
+            paid_str = c.paid_at.strftime("%d/%m/%Y") if c.paid_at else "data não disponível"
+            message += f"{i}. {c.customer_name} — R$ {float(c.amount):.2f} — paga em {paid_str}\n"
+
+        return message
+
+    except Exception as e:
+        logger.error(f"Error listing paid charges: {str(e)}")
+        return "Erro ao listar cobranças pagas. Tente novamente."
+
+
+async def handle_cancel_charge(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        charge_service = ChargeService(db)
+        customer_name = entities.get("customer_name")
+        amount = entities.get("amount")
+        reference = entities.get("reference")
+
+        candidates: list = []
+
+        if reference == "latest":
+            latest = await charge_service.get_latest_charge(user_id)
+            if latest:
+                candidates = [latest]
+        elif customer_name:
+            candidates = await charge_service.find_charges_by_customer_name(user_id, customer_name)
+            candidates = [c for c in candidates if c.status.value == "pending"]
+        elif amount:
+            from decimal import Decimal
+            candidates = await charge_service.find_charges_by_amount(user_id, Decimal(str(amount)))
+            candidates = [c for c in candidates if c.status.value == "pending"]
+
+        if not candidates:
+            return "Não encontrei nenhuma cobrança pendente com esses critérios para cancelar."
+
+        if len(candidates) == 1:
+            charge = candidates[0]
+            if charge.status.value != "pending":
+                return f"❌ A cobrança de R$ {float(charge.amount):.2f} para {charge.customer_name} já foi {charge.status.value} e não pode ser cancelada."
+            cancelled = await charge_service.cancel_charge(charge.id, user_id)
+            if cancelled:
+                return f"🚫 Cobrança de R$ {float(cancelled.amount):.2f} para {cancelled.customer_name} cancelada com sucesso."
+            return "Não consegui cancelar a cobrança. Tente novamente."
+
+        message = "Encontrei mais de uma cobrança:\n\n"
+        for i, c in enumerate(candidates, 1):
+            message += f"{i}. {c.customer_name} — R$ {float(c.amount):.2f} — {c.status.value}\n"
+        message += "\nQual você deseja cancelar? Responda com o número."
+        return message
+
+    except Exception as e:
+        logger.error(f"Error cancelling charge: {str(e)}")
+        return "Erro ao cancelar cobrança. Tente novamente."
 
 
 async def handle_check_charge_status(
@@ -634,7 +759,15 @@ async def handle_check_charge_status(
             return "Você ainda não tem cobranças para consultar."
 
         charge = charges[0]
-        status_label = "paga" if charge.status.value == "paid" else charge.status.value
+        derived = charge_service.get_derived_status(charge)
+        status_label = {
+            "pending": "pendente",
+            "paid": "paga",
+            "overdue": "vencida",
+            "cancelled": "cancelada",
+            "expired": "expirada",
+            "failed": "falhou"
+        }.get(derived, derived)
         return f"A cobrança mais recente de *R$ {float(charge.amount):.2f}* para *{charge.customer_name}* está *{status_label}*."
 
     except Exception as e:

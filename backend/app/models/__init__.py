@@ -10,6 +10,7 @@ from app.models.user_event import UserEvent
 from app.models.charge import Charge, ChargeStatus
 from app.models.pending_action import PendingAction, PendingActionStatus
 from app.models.provider_event import ProviderEvent
+from app.models.charge_reminder_log import ChargeReminderLog, ReminderType
 
 __all__ = [
     "User",
@@ -25,5 +26,7 @@ __all__ = [
     "ChargeStatus",
     "PendingAction",
     "PendingActionStatus",
-    "ProviderEvent"
+    "ProviderEvent",
+    "ChargeReminderLog",
+    "ReminderType"
 ]

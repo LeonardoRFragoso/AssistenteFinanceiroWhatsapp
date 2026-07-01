@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.pending_action import PendingAction, PendingActionStatus
 
 
@@ -60,7 +60,7 @@ class PendingActionRepository:
         if not action or action.status != PendingActionStatus.PENDING:
             return None
         action.status = PendingActionStatus.CONFIRMED
-        action.confirmed_at = datetime.utcnow()
+        action.confirmed_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(action)
         return action
@@ -79,7 +79,7 @@ class PendingActionRepository:
         if not action:
             return None
         action.status = PendingActionStatus.EXECUTED
-        action.executed_at = datetime.utcnow()
+        action.executed_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(action)
         return action

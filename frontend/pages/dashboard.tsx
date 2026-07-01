@@ -5,7 +5,7 @@ import WhatsAppConnect from '../components/WhatsAppConnect';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign } from 'lucide-react';
 
 interface DashboardData {
   summary: {
@@ -35,9 +35,21 @@ interface Charge {
   amount: number;
   description?: string;
   status: string;
+  derived_status?: string;
   payment_link?: string;
+  due_date?: string;
   created_at: string;
   paid_at?: string;
+}
+
+interface ChargeSummary {
+  total_pending: number;
+  total_paid: number;
+  total_overdue: number;
+  count_pending: number;
+  count_paid: number;
+  count_overdue: number;
+  count_cancelled: number;
 }
 
 export default function Dashboard() {
@@ -45,6 +57,10 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [charges, setCharges] = useState<Charge[]>([]);
+  const [chargeSummary, setChargeSummary] = useState<ChargeSummary | null>(null);
+  const [chargeFilter, setChargeFilter] = useState<string>('all');
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -59,20 +75,91 @@ export default function Dashboard() {
 
   const loadData = async () => {
     try {
-      const [dashRes, usageRes, chargesRes] = await Promise.all([
+      const [dashRes, usageRes, chargesRes, summaryRes] = await Promise.all([
         reportsAPI.getDashboard(),
         billingAPI.getUsage(),
-        chargesAPI.getAll(5),
+        chargesAPI.getAll(50),
+        chargesAPI.getSummary(),
       ]);
       setData(dashRes.data);
       setUsage(usageRes.data);
       setCharges(chargesRes.data?.items || []);
+      setChargeSummary(summaryRes.data);
     } catch (err: any) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
+
+  const loadCharges = async (filter: string) => {
+    try {
+      const statusParam = filter === 'all' ? undefined : filter === 'overdue' ? 'pending' : filter;
+      const res = await chargesAPI.getAll(50, statusParam);
+      setCharges(res.data?.items || []);
+    } catch (err: any) {
+      console.error('Error loading charges:', err);
+    }
+  };
+
+  const handleChargeFilterChange = (filter: string) => {
+    setChargeFilter(filter);
+    loadCharges(filter);
+  };
+
+  const handleCopyLink = async (id: number, link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleCancelCharge = async (id: number) => {
+    setCancellingId(id);
+    try {
+      await chargesAPI.cancel(id);
+      await loadCharges(chargeFilter);
+      const summaryRes = await chargesAPI.getSummary();
+      setChargeSummary(summaryRes.data);
+    } catch (err: any) {
+      console.error('Error cancelling charge:', err);
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const getChargeDisplayStatus = (charge: Charge): string => {
+    if (charge.derived_status) return charge.derived_status;
+    return charge.status;
+  };
+
+  const statusLabelMap: Record<string, string> = {
+    pending: 'Pendente',
+    paid: 'Pago',
+    overdue: 'Vencida',
+    cancelled: 'Cancelada',
+    expired: 'Expirada',
+    failed: 'Falhou',
+  };
+
+  const statusColorMap: Record<string, string> = {
+    pending: 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30',
+    paid: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30',
+    overdue: 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30',
+    cancelled: 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900/30',
+    expired: 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30',
+    failed: 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30',
+  };
+
+  const filteredCharges = charges.filter((c) => {
+    const displayStatus = getChargeDisplayStatus(c);
+    if (chargeFilter === 'all') return true;
+    if (chargeFilter === 'overdue') return displayStatus === 'overdue';
+    return displayStatus === chargeFilter;
+  });
 
   if (loading) {
     return (
@@ -370,51 +457,145 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Charges - Modern card */}
+        {/* Charge Summary Cards */}
+        {chargeSummary && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 rounded-2xl shadow-lg p-5 border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">A Receber</span>
+              </div>
+              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">R$ {Number(chargeSummary.total_pending + chargeSummary.total_overdue).toFixed(2)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{chargeSummary.count_pending + chargeSummary.count_overdue} cobrança(s)</p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl shadow-lg p-5 border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Recebido</span>
+              </div>
+              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">R$ {Number(chargeSummary.total_paid).toFixed(2)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{chargeSummary.count_paid} cobrança(s)</p>
+            </div>
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-2xl shadow-lg p-5 border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Receipt className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">Pendentes</span>
+              </div>
+              <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{chargeSummary.count_pending - chargeSummary.count_overdue}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">aguardando pagamento</p>
+            </div>
+            <div className="bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-2xl shadow-lg p-5 border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span className="text-xs font-medium text-red-700 dark:text-red-300">Vencidas</span>
+              </div>
+              <p className="text-xl font-bold text-red-600 dark:text-red-400">{chargeSummary.count_overdue}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">precisam de atenção</p>
+            </div>
+          </div>
+        )}
+
+        {/* Charges - Enhanced section */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Cobranças</h3>
             </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              {['all', 'pending', 'paid', 'overdue', 'cancelled'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => handleChargeFilterChange(f)}
+                  className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${
+                    chargeFilter === f
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : f === 'paid' ? 'Pagas' : f === 'overdue' ? 'Vencidas' : 'Canceladas'}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="p-6">
-            {charges.length > 0 ? (
-              <div className="space-y-3">
-                {charges.map((c) => (
-                  <div key={c.id} className="group flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`p-2 rounded-lg ${c.status === 'paid' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
-                        <Receipt className={`w-4 h-4 ${c.status === 'paid' ? 'text-emerald-600 dark:text-emerald-400' : 'text-yellow-600 dark:text-yellow-400'}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {c.customer_name}{c.description ? ` - ${c.description}` : ''}
-                        </p>
-                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(c.created_at).toLocaleDateString('pt-BR')}
-                          <span className="ml-2 capitalize">{c.status === 'paid' ? 'Pago' : c.status === 'pending' ? 'Pendente' : c.status}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                      <span className={`text-sm font-bold ${c.status === 'paid' ? 'text-emerald-600 dark:text-emerald-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                        R$ {Number(c.amount).toFixed(2)}
-                      </span>
-                      {c.payment_link && (
-                        <a href={c.payment_link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" title="Abrir link de pagamento">
-                          <Link2 className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
+            {filteredCharges.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Cliente</th>
+                      <th className="text-right py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Valor</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">Descrição</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Status</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Vencimento</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">Criada</th>
+                      <th className="text-center py-2 px-3 font-medium text-gray-500 dark:text-gray-400">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCharges.map((c) => {
+                      const displayStatus = getChargeDisplayStatus(c);
+                      const statusLabel = statusLabelMap[displayStatus] || displayStatus;
+                      const statusColor = statusColorMap[displayStatus] || statusColorMap['pending'];
+                      const canCancel = displayStatus === 'pending' || displayStatus === 'overdue';
+                      return (
+                        <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                          <td className="py-3 px-3">
+                            <p className="font-medium text-gray-900 dark:text-gray-100">{c.customer_name}</p>
+                            {c.customer_phone && <p className="text-xs text-gray-400 dark:text-gray-500">{c.customer_phone}</p>}
+                          </td>
+                          <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">R$ {Number(c.amount).toFixed(2)}</td>
+                          <td className="py-3 px-3 hidden sm:table-cell text-gray-600 dark:text-gray-400 max-w-xs truncate">{c.description || '-'}</td>
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                              {statusLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400 text-xs">{c.due_date ? new Date(c.due_date + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                          <td className="py-3 px-3 hidden lg:table-cell text-gray-500 dark:text-gray-400 text-xs">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center justify-center gap-1">
+                              {c.payment_link && (
+                                <>
+                                  <a href={c.payment_link} target="_blank" rel="noopener noreferrer" className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors" title="Abrir link">
+                                    <Link2 className="w-4 h-4" />
+                                  </a>
+                                  <button
+                                    onClick={() => handleCopyLink(c.id, c.payment_link!)}
+                                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                    title="Copiar link"
+                                  >
+                                    {copiedId === c.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                  </button>
+                                </>
+                              )}
+                              {canCancel && (
+                                <button
+                                  onClick={() => handleCancelCharge(c.id)}
+                                  disabled={cancellingId === c.id}
+                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                  title="Cancelar cobrança"
+                                >
+                                  {cancellingId === c.id ? (
+                                    <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="text-center py-8">
                 <Receipt className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma cobrança criada</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma cobrança encontrada</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Use o WhatsApp para criar cobranças</p>
               </div>
             )}

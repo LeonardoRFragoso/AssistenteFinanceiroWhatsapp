@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, Any, Optional
 from app.providers.base import PaymentProvider
@@ -44,7 +44,7 @@ class FakePaymentProvider(PaymentProvider):
                 "customer_phone": customer_phone,
                 "external_reference": external_reference,
                 "due_date": due_date,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
         }
 
@@ -69,7 +69,7 @@ class FakePaymentProvider(PaymentProvider):
                 "external_reference": payload.get("external_reference"),
                 "amount": Decimal(str(payload.get("amount", 0))) if payload.get("amount") else None,
                 "status": "paid",
-                "paid_at": payload.get("paid_at") or datetime.utcnow().isoformat(),
+                "paid_at": payload.get("paid_at") or datetime.now(timezone.utc).isoformat(),
                 "raw_data": payload
             }
 
@@ -88,5 +88,5 @@ class FakePaymentProvider(PaymentProvider):
             "event_type": "payment.approved",
             "provider_charge_id": provider_charge_id,
             "amount": float(amount) if amount else None,
-            "paid_at": datetime.utcnow().isoformat()
+            "paid_at": datetime.now(timezone.utc).isoformat()
         }

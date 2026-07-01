@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, func, case
 from typing import List, Optional
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from app.models.charge import Charge, ChargeStatus
 
 
@@ -65,6 +65,154 @@ class ChargeRepository:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def get_pending_by_user(self, user_id: int) -> List[Charge]:
+        result = await self.db.execute(
+            select(Charge)
+            .where(and_(Charge.user_id == user_id, Charge.status == ChargeStatus.PENDING))
+            .order_by(desc(Charge.created_at))
+        )
+        return list(result.scalars().all())
+
+    async def get_paid_by_user(self, user_id: int, limit: int = 10) -> List[Charge]:
+        result = await self.db.execute(
+            select(Charge)
+            .where(and_(Charge.user_id == user_id, Charge.status == ChargeStatus.PAID))
+            .order_by(desc(Charge.paid_at))
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_overdue_by_user(self, user_id: int) -> List[Charge]:
+        today = date.today()
+        result = await self.db.execute(
+            select(Charge)
+            .where(
+                and_(
+                    Charge.user_id == user_id,
+                    Charge.status == ChargeStatus.PENDING,
+                    Charge.due_date.isnot(None),
+                    Charge.due_date < today
+                )
+            )
+            .order_by(Charge.due_date)
+        )
+        return list(result.scalars().all())
+
+    async def get_due_soon_by_user(self, user_id: int, days_ahead: int = 1) -> List[Charge]:
+        today = date.today()
+        threshold = today + timedelta(days=days_ahead)
+        result = await self.db.execute(
+            select(Charge)
+            .where(
+                and_(
+                    Charge.user_id == user_id,
+                    Charge.status == ChargeStatus.PENDING,
+                    Charge.due_date.isnot(None),
+                    Charge.due_date <= threshold,
+                    Charge.due_date >= today
+                )
+            )
+            .order_by(Charge.due_date)
+        )
+        return list(result.scalars().all())
+
+    async def get_all_due_soon(self, days_ahead: int = 1) -> List[Charge]:
+        today = date.today()
+        threshold = today + timedelta(days=days_ahead)
+        result = await self.db.execute(
+            select(Charge)
+            .where(
+                and_(
+                    Charge.status == ChargeStatus.PENDING,
+                    Charge.due_date.isnot(None),
+                    Charge.due_date <= threshold,
+                    Charge.due_date >= today
+                )
+            )
+            .order_by(Charge.due_date)
+        )
+        return list(result.scalars().all())
+
+    async def get_all_overdue(self) -> List[Charge]:
+        today = date.today()
+        result = await self.db.execute(
+            select(Charge)
+            .where(
+                and_(
+                    Charge.status == ChargeStatus.PENDING,
+                    Charge.due_date.isnot(None),
+                    Charge.due_date < today
+                )
+            )
+            .order_by(Charge.due_date)
+        )
+        return list(result.scalars().all())
+
+    async def get_summary(self, user_id: int) -> dict:
+        today = date.today()
+        query = select(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (and_(Charge.status == ChargeStatus.PENDING, Charge.due_date.is_(None)), Charge.amount),
+                        else_=0
+                    )
+                ), 0
+            ).label("total_pending"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (Charge.status == ChargeStatus.PAID, Charge.amount),
+                        else_=0
+                    )
+                ), 0
+            ).label("total_paid"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (and_(Charge.status == ChargeStatus.PENDING, Charge.due_date.isnot(None), Charge.due_date < today), Charge.amount),
+                        else_=0
+                    )
+                ), 0
+            ).label("total_overdue"),
+            func.count(
+                case(
+                    (Charge.status == ChargeStatus.PENDING, 1),
+                    else_=None
+                )
+            ).label("count_pending"),
+            func.count(
+                case(
+                    (Charge.status == ChargeStatus.PAID, 1),
+                    else_=None
+                )
+            ).label("count_paid"),
+            func.count(
+                case(
+                    (and_(Charge.status == ChargeStatus.PENDING, Charge.due_date.isnot(None), Charge.due_date < today), 1),
+                    else_=None
+                )
+            ).label("count_overdue"),
+            func.count(
+                case(
+                    (Charge.status == ChargeStatus.CANCELLED, 1),
+                    else_=None
+                )
+            ).label("count_cancelled"),
+        ).where(Charge.user_id == user_id)
+
+        result = await self.db.execute(query)
+        row = result.one()
+        return {
+            "total_pending": Decimal(str(row.total_pending)),
+            "total_paid": Decimal(str(row.total_paid)),
+            "total_overdue": Decimal(str(row.total_overdue)),
+            "count_pending": row.count_pending or 0,
+            "count_paid": row.count_paid or 0,
+            "count_overdue": row.count_overdue or 0,
+            "count_cancelled": row.count_cancelled or 0,
+        }
+
     async def update_status(
         self,
         charge_id: int,
@@ -89,3 +237,29 @@ class ChargeRepository:
         await self.db.commit()
         await self.db.refresh(charge)
         return charge
+
+    async def find_by_customer_name(self, user_id: int, customer_name: str) -> List[Charge]:
+        result = await self.db.execute(
+            select(Charge)
+            .where(
+                and_(
+                    Charge.user_id == user_id,
+                    Charge.customer_name.ilike(f"%{customer_name}%")
+                )
+            )
+            .order_by(desc(Charge.created_at))
+        )
+        return list(result.scalars().all())
+
+    async def find_by_amount(self, user_id: int, amount: Decimal) -> List[Charge]:
+        result = await self.db.execute(
+            select(Charge)
+            .where(
+                and_(
+                    Charge.user_id == user_id,
+                    Charge.amount == amount
+                )
+            )
+            .order_by(desc(Charge.created_at))
+        )
+        return list(result.scalars().all())

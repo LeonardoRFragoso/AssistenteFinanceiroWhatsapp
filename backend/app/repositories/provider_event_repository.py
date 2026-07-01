@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.provider_event import ProviderEvent
 
 
@@ -56,7 +56,7 @@ class ProviderEventRepository:
         if not event:
             return None
         event.processed = True
-        event.processed_at = datetime.utcnow()
+        event.processed_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(event)
         return event
