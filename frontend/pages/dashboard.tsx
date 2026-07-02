@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import WhatsAppConnect from '../components/WhatsAppConnect';
 import RecurringTasksSection from '../components/RecurringTasksSection';
 import CustomerIntelligenceSection from '../components/CustomerIntelligenceSection';
+import AdvancedAnalyticsSection from '../components/AdvancedAnalyticsSection';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
@@ -846,6 +847,9 @@ export default function Dashboard() {
 
         {/* Recurring Tasks Section */}
         <RecurringTasksSection />
+
+        {/* Advanced Analytics Section */}
+        <AdvancedAnalyticsSection />
 
         {/* Customer Intelligence & Collection Section */}
         <CustomerIntelligenceSection />

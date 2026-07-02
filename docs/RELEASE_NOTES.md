@@ -1,5 +1,21 @@
 # PayFlow AI — Release Notes
 
+## Sprint 10: Advanced Analytics, Collection Performance e Business Insights
+
+- **ChargeAnalyticsService** (`charge_analytics_service.py`): métricas operacionais por usuário
+  - Overview: total cobrado, recebido, pendente, vencido, taxas, tempo médio de pagamento, atraso médio
+  - Tendências mensais (1-12 meses)
+  - Aging de vencidas em 5 faixas (1-7, 8-15, 16-30, 31-60, 60+ dias)
+  - Ranking de clientes com status operacional e ações sugeridas
+  - Performance da régua de cobrança (rascunhos, clientes contatados, recuperados)
+  - Insights textuais em português, sem alarmismo, sem credit scoring
+- **Router `/analytics`** com 8 endpoints: overview, monthly-trends, aging, customer-performance, collection-performance, insights, export.csv, export.pdf
+- **WhatsApp**: 5 novos intents (analytics_overview, monthly_trends_summary, aging_summary, customer_performance_summary, collection_performance_summary)
+- **Frontend**: `AdvancedAnalyticsSection.tsx` com cards, gráficos Recharts, tabela de ranking, filtros de período, exportação CSV/PDF
+- **Testes**: 27 backend + 2 E2E + 1 screenshot
+- **Total**: 261 backend + 27 E2E
+- **Segurança**: isolamento por user_id, sem credit scoring, sem operações bancárias, QR Code sandbox
+
 ## Sprint 1: Charge Foundation
 
 - Modelo `Charge` com campos: customer_name, customer_phone, amount, description, provider, provider_charge_id, payment_link, status, due_date

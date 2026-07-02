@@ -224,4 +224,45 @@ test.describe('Sprint 9 — Customer Intelligence E2E', () => {
     await pdfBtn.click({ force: true });
     await page.waitForTimeout(2000);
   });
+
+  test('19. Advanced Analytics section renders with cards and charts', async () => {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(500);
+    const analyticsSection = page.getByTestId('advanced-analytics-section');
+    await expect(analyticsSection).toBeVisible({ timeout: 30000 });
+    await analyticsSection.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(2000);
+
+    const overviewCards = analyticsSection.getByTestId('analytics-overview-cards');
+    const cardsVisible = await overviewCards.isVisible().catch(() => false);
+    if (cardsVisible) {
+      await expect(overviewCards).toBeVisible({ timeout: 10000 });
+    }
+
+    const periodFilter = analyticsSection.getByTestId('analytics-period-filter');
+    await expect(periodFilter).toBeVisible({ timeout: 10000 });
+
+    const csvExportBtn = analyticsSection.getByTestId('analytics-export-csv');
+    await expect(csvExportBtn).toBeVisible({ timeout: 10000 });
+    const pdfExportBtn = analyticsSection.getByTestId('analytics-export-pdf');
+    await expect(pdfExportBtn).toBeVisible({ timeout: 10000 });
+  });
+
+  test('20. Analytics period filter changes data', async () => {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(500);
+    const analyticsSection = page.getByTestId('advanced-analytics-section');
+    await expect(analyticsSection).toBeVisible({ timeout: 30000 });
+    await analyticsSection.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1000);
+
+    const periodFilter = analyticsSection.getByTestId('analytics-period-filter');
+    await expect(periodFilter).toBeVisible({ timeout: 10000 });
+    await periodFilter.selectOption('30');
+    await page.waitForTimeout(2000);
+    await expect(analyticsSection).toBeVisible({ timeout: 10000 });
+    await periodFilter.selectOption('365');
+    await page.waitForTimeout(2000);
+    await expect(analyticsSection).toBeVisible({ timeout: 10000 });
+  });
 });

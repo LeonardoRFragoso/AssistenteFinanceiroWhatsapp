@@ -51,6 +51,11 @@ INTENTS POSSÍVEIS:
 - list_collection_rules: Usuário quer listar regras de cobrança (ex: "quais regras de cobrança eu tenho?", "minha régua de cobrança")
 - create_collection_rule: Usuário quer criar regra de cobrança (ex: "crie uma régua para lembrar 2 dias antes do vencimento", "criar regra de cobrança")
 - list_message_templates: Usuário quer listar templates de mensagem (ex: "quais templates de cobrança eu tenho?", "meus templates")
+- analytics_overview: Usuário quer visão geral de analytics (ex: "como estão minhas cobranças?", "resumo das minhas cobranças", "me dá um panorama geral")
+- monthly_trends_summary: Usuário quer tendências mensais (ex: "como estão minhas cobranças este mês?", "tendência mensal", "comparativo mensal")
+- aging_summary: Usuário quer aging de vencidas (ex: "quanto tenho vencido há mais de 30 dias?", "aging das cobranças", "faixas de atraso")
+- customer_performance_summary: Usuário quer ranking de clientes (ex: "quais clientes mais atrasam?", "performance dos clientes", "ranking de clientes")
+- collection_performance_summary: Usuário quer performance da régua de cobrança (ex: "me dá um resumo da performance de cobrança", "como está minha régua de cobrança?")
 - help: Usuário precisa de ajuda ou não entendeu
 
 EXTRAÇÃO DE ENTIDADES:
