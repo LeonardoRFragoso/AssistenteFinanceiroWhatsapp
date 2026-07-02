@@ -15,7 +15,7 @@ def get_database_url() -> str:
 
 _db_url = get_database_url()
 _engine_kwargs = {
-    "echo": settings.ENVIRONMENT == "development",
+    "echo": settings.ENVIRONMENT == "development" and settings.LOG_LEVEL != "WARNING",
     "future": True,
     "pool_pre_ping": True,
 }

@@ -137,7 +137,27 @@ npm run test:e2e
 ![Analytics](docs/assets/analytics.png)
 ![Export](docs/assets/export-pdf.png)
 
+### E2E Report
+
+![E2E Report](docs/assets/e2e-report.png)
+
 > Screenshots gerados via `npx playwright test e2e/screenshots.spec.ts` contra a demo stack.
+
+## Documentação
+
+| Documento | Descrição |
+|---|---|
+| [Case Study](docs/CASE_STUDY.md) | Case study técnico completo |
+| [Release Notes](docs/RELEASE_NOTES.md) | Release notes por sprint |
+| [Release Candidate Checklist](docs/RELEASE_CANDIDATE_CHECKLIST.md) | Checklist de release candidate |
+| [Publication Checklist](docs/PUBLICATION_CHECKLIST.md) | Checklist final de publicação |
+| [Architecture](docs/ARCHITECTURE.md) | Arquitetura detalhada |
+| [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Guia de deploy |
+| [E2E Testing](docs/E2E_TESTING.md) | Guia de testes E2E |
+| [Observability](docs/OBSERVABILITY.md) | Sentry, audit logging, admin metrics |
+| [Security Hardening](docs/SECURITY_HARDENING.md) | Demo mode, rate limiting, webhook hardening |
+| [LinkedIn Launch Post](docs/LINKEDIN_LAUNCH_POST.md) | Post LinkedIn para lançamento |
+| [Demo Video Script](docs/DEMO_VIDEO_SCRIPT.md) | Roteiro de vídeo demo |
 
 ## Limitações conscientes
 

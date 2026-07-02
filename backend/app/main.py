@@ -69,7 +69,8 @@ if hasattr(settings, 'FRONTEND_URL') and settings.FRONTEND_URL not in cors_origi
 if hasattr(settings, 'BACKEND_URL') and settings.BACKEND_URL not in cors_origins:
     cors_origins.append(settings.BACKEND_URL)
 
-app.add_middleware(IPRateLimitMiddleware, requests_per_minute=100)
+_ip_rate_limit = 300 if settings.ENABLE_DEMO_MODE else 100
+app.add_middleware(IPRateLimitMiddleware, requests_per_minute=_ip_rate_limit)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
