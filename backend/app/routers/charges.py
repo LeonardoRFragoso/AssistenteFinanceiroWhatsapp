@@ -372,3 +372,32 @@ async def cancel_charge(
             detail="Charge cannot be cancelled or not found"
         )
     return charge
+
+
+@router.get("/{charge_id}/qr-code")
+async def get_charge_qr_code(
+    charge_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Return the sandbox QR code for a charge.
+
+    The QR code is fake/sandbox and does NOT represent a Pix QR code.
+    It points to the fake payment link for demonstration purposes only.
+    """
+    service = ChargeService(db)
+    charge = await service.get_charge(charge_id, current_user.id)
+    if not charge:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Charge not found"
+        )
+
+    return {
+        "charge_id": charge.id,
+        "qr_code": charge.qr_code,
+        "qr_code_base64": charge.qr_code_base64,
+        "payment_link": charge.payment_link,
+        "is_sandbox": True,
+        "warning": "Sandbox/Demo — não representa Pix real",
+    }

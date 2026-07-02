@@ -32,9 +32,17 @@ INTENTS POSSÍVEIS:
 - list_charges: Usuário quer listar cobranças criadas
 - list_pending_charges: Usuário quer listar apenas cobranças pendentes
 - list_paid_charges: Usuário quer listar apenas cobranças pagas
+- list_overdue_charges: Usuário quer listar cobranças vencidas (ex: "quais cobranças estão vencidas?", "quem está atrasado?")
 - check_charge_status: Usuário quer saber se uma cobrança específica foi paga
 - cancel_charge: Usuário quer cancelar uma cobrança já criada (ex: "cancela a cobrança do João", "cancela a última cobrança")
 - send_charge_link: Usuário quer enviar o link de pagamento para o cliente (ex: "envia o link para o cliente", "manda o link para ele", "sim, envia")
+- search_charges: Usuário quer buscar cobranças por cliente (ex: "me mostra as cobranças do João", "quais cobranças tenho para Maria?")
+- charge_summary: Usuário quer um resumo geral das cobranças (ex: "me manda um resumo das cobranças", "quanto tenho a receber?")
+- customer_charge_history: Usuário quer histórico de um cliente específico (ex: "histórico do João", "me mostra tudo do Carlos")
+- monthly_financial_summary: Usuário quer resumo financeiro de um mês específico (ex: "quanto entrou em junho?", "resumo financeiro de julho", "me manda um resumo de julho")
+- top_overdue_customers: Usuário quer saber quais clientes mais atrasam (ex: "quais clientes mais atrasaram pagamento?", "quem mais me deve?")
+- create_recurring_task: Usuário quer criar uma tarefa/lembrete recorrente (ex: "todo dia 5 me lembra de cobrar o João", "toda sexta me lembra de revisar cobranças")
+- list_recurring_tasks: Usuário quer listar tarefas recorrentes (ex: "quais lembretes recorrentes tenho?", "minhas tarefas automáticas")
 - help: Usuário precisa de ajuda ou não entendeu
 
 EXTRAÇÃO DE ENTIDADES:
@@ -73,6 +81,19 @@ Para cancel_charge, extraia:
 - customer_name (nome do cliente mencionado, se houver)
 - amount (valor mencionado, se houver)
 - reference: "latest" se o usuário disse "última cobrança", ou null
+
+Para search_charges e customer_charge_history, extraia:
+- customer_name (nome do cliente mencionado, obrigatório)
+
+Para monthly_financial_summary, extraia:
+- month (número do mês, 1-12)
+- year (ano com 4 dígitos, se não informado use o ano atual)
+
+Para create_recurring_task, extraia:
+- title (título/descrição da tarefa recorrente)
+- recurrence_type: "daily", "weekly", ou "monthly"
+- day_of_week (0-6, onde 0=domingo, apenas para weekly)
+- day_of_month (1-31, apenas para monthly)
 
 IMPORTANTE:
 - Entenda português informal e gírias

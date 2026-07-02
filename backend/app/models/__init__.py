@@ -12,6 +12,7 @@ from app.models.pending_action import PendingAction, PendingActionStatus
 from app.models.provider_event import ProviderEvent
 from app.models.charge_reminder_log import ChargeReminderLog, ReminderType
 from app.models.charge_delivery_log import ChargeDeliveryLog, DeliveryStatus, DeliveryChannel
+from app.models.recurring_task import RecurringTask, RecurringTaskLog, RecurrenceType
 
 __all__ = [
     "User",
@@ -32,5 +33,8 @@ __all__ = [
     "ReminderType",
     "ChargeDeliveryLog",
     "DeliveryStatus",
-    "DeliveryChannel"
+    "DeliveryChannel",
+    "RecurringTask",
+    "RecurringTaskLog",
+    "RecurrenceType",
 ]

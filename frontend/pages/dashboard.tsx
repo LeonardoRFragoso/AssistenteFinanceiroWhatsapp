@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import WhatsAppConnect from '../components/WhatsAppConnect';
+import RecurringTasksSection from '../components/RecurringTasksSection';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download, FileText, Search, ChevronLeft, ChevronRight, Activity, Percent } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download, FileText, Search, ChevronLeft, ChevronRight, Activity, Percent, QrCode, X } from 'lucide-react';
 
 interface DashboardData {
   summary: {
@@ -37,6 +38,8 @@ interface Charge {
   status: string;
   derived_status?: string;
   payment_link?: string;
+  qr_code?: string;
+  qr_code_base64?: string;
   due_date?: string;
   created_at: string;
   paid_at?: string;
@@ -88,6 +91,7 @@ export default function Dashboard() {
   const [chargesError, setChargesError] = useState('');
   const [exportingCSV, setExportingCSV] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [qrModalCharge, setQrModalCharge] = useState<Charge | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -768,6 +772,15 @@ export default function Dashboard() {
                                     >
                                       {copiedId === c.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                     </button>
+                                    {c.qr_code_base64 && (
+                                      <button
+                                        onClick={() => setQrModalCharge(c)}
+                                        className="p-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+                                        title="Ver QR Code (sandbox)"
+                                      >
+                                        <QrCode className="w-4 h-4" />
+                                      </button>
+                                    )}
                                   </>
                                 )}
                                 {canCancel && (
@@ -830,9 +843,73 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Recurring Tasks Section */}
+        <RecurringTasksSection />
+
         {/* WhatsApp Connection */}
         <WhatsAppConnect />
       </div>
+
+      {/* QR Code Modal (sandbox) */}
+      {qrModalCharge && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setQrModalCharge(null)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setQrModalCharge(null)}
+              className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 text-center">QR Code (Sandbox)</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-4">
+              Cobrança #{qrModalCharge.id} — {qrModalCharge.customer_name}
+            </p>
+            <div className="flex justify-center mb-4">
+              {qrModalCharge.qr_code_base64 ? (
+                <img
+                  src={qrModalCharge.qr_code_base64}
+                  alt="QR Code sandbox"
+                  className="w-48 h-48 rounded-lg border border-gray-200 dark:border-gray-700"
+                />
+              ) : (
+                <div className="w-48 h-48 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                  <QrCode className="w-16 h-16 text-gray-300 dark:text-gray-500" />
+                </div>
+              )}
+            </div>
+            <div className="text-center mb-3">
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                R$ {qrModalCharge.amount.toFixed(2)}
+              </p>
+              {qrModalCharge.description && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{qrModalCharge.description}</p>
+              )}
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-center">
+              <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                ⚠️ Sandbox/Demo — não representa Pix real
+              </p>
+            </div>
+            {qrModalCharge.payment_link && (
+              <a
+                href={qrModalCharge.payment_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+              >
+                <Link2 className="w-4 h-4" />
+                Abrir link de pagamento
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

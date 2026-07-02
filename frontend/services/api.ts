@@ -113,6 +113,23 @@ export const chargesAPI = {
   },
 };
 
+export const recurringTasksAPI = {
+  list: () => api.get('/recurring-tasks'),
+  create: (data: { title: string; description?: string; recurrence_type: string; day_of_week?: number; day_of_month?: number }) =>
+    api.post('/recurring-tasks', data),
+  cancel: (id: number) => api.post(`/recurring-tasks/${id}/cancel`),
+};
+
+export const documentsAPI = {
+  analyze: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/documents/analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
 export const adminAPI = {
   getMetrics: () => api.get('/admin/metrics'),
   getFunnel: () => api.get('/admin/funnel'),

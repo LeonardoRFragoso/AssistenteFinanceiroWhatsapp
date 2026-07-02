@@ -1,9 +1,12 @@
 import uuid
+import io
+import base64
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, Any, Optional
 from app.providers.base import PaymentProvider
 from app.core.config import settings
+from app.core.logging import logger
 
 
 class FakePaymentProvider(PaymentProvider):
@@ -11,6 +14,9 @@ class FakePaymentProvider(PaymentProvider):
 
     Generates deterministic fake links and IDs so the product flow can be
     exercised without touching real financial institutions.
+
+    QR Codes are sandbox-only and point to the fake payment link.
+    They do NOT represent Pix QR codes and contain no real banking data.
     """
 
     name = "fake"
@@ -27,13 +33,13 @@ class FakePaymentProvider(PaymentProvider):
     ) -> Dict[str, Any]:
         provider_charge_id = f"fake_{uuid.uuid4().hex[:12]}"
         payment_link = f"{settings.BACKEND_URL}/provider-webhooks/fake/pay/{provider_charge_id}"
-        qr_code = f"fake-pix-code:{provider_charge_id}:{amount}"
-        qr_code_base64 = f"data:image/png;base64,{uuid.uuid4().hex}"
+        qr_code_payload = payment_link
+        qr_code_base64 = self._generate_qr_code_base64(qr_code_payload)
 
         return {
             "provider_charge_id": provider_charge_id,
             "payment_link": payment_link,
-            "qr_code": qr_code,
+            "qr_code": qr_code_payload,
             "qr_code_base64": qr_code_base64,
             "status": "pending",
             "raw_response": {
@@ -47,6 +53,31 @@ class FakePaymentProvider(PaymentProvider):
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
         }
+
+    def _generate_qr_code_base64(self, payload: str) -> str:
+        """Generate a QR code PNG image as base64 data URI.
+
+        This is a sandbox/demo QR code that points to the fake payment link.
+        It is NOT a Pix QR code and contains no real banking data.
+        """
+        try:
+            import qrcode
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=8,
+                border=2,
+            )
+            qr.add_data(payload)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            return f"data:image/png;base64,{b64}"
+        except Exception as e:
+            logger.warning(f"Could not generate QR code image: {str(e)}, using placeholder")
+            return f"data:image/png;base64,{uuid.uuid4().hex}"
 
     async def get_charge(self, provider_charge_id: str) -> Optional[Dict[str, Any]]:
         return {

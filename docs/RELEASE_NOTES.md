@@ -103,3 +103,14 @@
 - **Entrypoint fix** — respeita `command` override do docker-compose
 - **Documentação** — `E2E_TESTING.md` reescrito com Option A (demo stack) e Option B (dev only)
 - **README** — seções de teste atualizadas com E2E demo stack
+
+## Sprint 8: WhatsApp Intelligence, QR Code Sandbox, OCR Assistivo e Tarefas Recorrentes
+
+- **WhatsApp Intelligence** — 8 novos intents: list_overdue, search_charges, charge_summary, customer_charge_history, monthly_financial_summary, top_overdue_customers, create_recurring_task, list_recurring_tasks
+- **FinancialQueryService** — serviço dedicado para consultas financeiras formatadas para WhatsApp
+- **QR Code sandbox** — fake provider gera QR Code PNG real (base64), endpoint `GET /charges/{id}/qr-code`, modal no dashboard
+- **OCR Assistivo** — `DocumentAnalysisService` com OpenAI Vision para imagens e PyPDF2 para PDFs, endpoint `POST /documents/analyze`
+- **WhatsApp mídia** — webhook aceita imagens e PDFs, roteia para análise automática
+- **Tarefas recorrentes** — model `RecurringTask` + `RecurringTaskLog`, service, endpoints, worker job, componente frontend
+- **27 novos testes** — FinancialQueryService (10), RecurringTaskService (8), DocumentAnalysisService (7), QR Code (2)
+- **Documentação** — `SPRINT_8_WHATSAPP_INTELLIGENCE.md`

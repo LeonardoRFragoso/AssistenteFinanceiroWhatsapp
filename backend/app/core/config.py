@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     ENABLE_WORKER: bool = True
     ENABLE_CHARGE_REMINDER_WORKER: bool = False
     CHARGE_REMINDER_INTERVAL_MINUTES: int = 60
+    ENABLE_RECURRING_TASK_WORKER: bool = False
+    RECURRING_TASK_INTERVAL_MINUTES: int = 30
     
     # Admin access (comma-separated emails)
     ADMIN_EMAILS: str = ""
