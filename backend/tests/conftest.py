@@ -14,6 +14,7 @@ from app.models.collection_rule import CollectionRule
 from app.models.collection_message_log import CollectionMessageLog
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.recurring_task import RecurringTask, RecurringTaskLog
+from app.models.billing import SubscriptionPlan, OrganizationSubscription, UsageCounter, BillingEvent, SubscriptionStatus, BillingProvider
 from datetime import datetime, timezone
 
 
@@ -81,6 +82,17 @@ async def sample_organization(db_session, sample_user):
     db_session.add(member)
     await db_session.commit()
     await db_session.refresh(org)
+
+    # Seed billing plans and create Professional subscription
+    from app.services.saas_billing_service import SaaSBillingService
+    billing = SaaSBillingService(db_session)
+    await billing.seed_plans()
+    await billing.ensure_free_subscription(org.id)
+    try:
+        await billing.change_plan(org.id, "professional")
+    except Exception:
+        pass
+
     return org
 
 
@@ -105,4 +117,15 @@ async def second_organization(db_session, second_user):
     db_session.add(member)
     await db_session.commit()
     await db_session.refresh(org)
+
+    # Seed billing plans and create Professional subscription
+    from app.services.saas_billing_service import SaaSBillingService
+    billing = SaaSBillingService(db_session)
+    await billing.seed_plans()
+    await billing.ensure_free_subscription(org.id)
+    try:
+        await billing.change_plan(org.id, "professional")
+    except Exception:
+        pass
+
     return org

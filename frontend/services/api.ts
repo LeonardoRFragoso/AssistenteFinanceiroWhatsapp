@@ -238,4 +238,17 @@ export const organizationsAPI = {
     api.post(`/organizations/${orgId}/members/${memberId}/deactivate`),
 };
 
+export const saasBillingAPI = {
+  getPlans: () => api.get('/saas-billing/plans'),
+  getSubscription: () => api.get('/saas-billing/subscription'),
+  getEntitlements: () => api.get('/saas-billing/entitlements'),
+  getUsage: () => api.get('/saas-billing/usage'),
+  changePlan: (planCode: string) =>
+    api.post('/saas-billing/subscription/change-plan', { plan_code: planCode }),
+  cancelSubscription: () => api.post('/saas-billing/subscription/cancel'),
+  reactivateSubscription: () => api.post('/saas-billing/subscription/reactivate'),
+  fakeCheckout: (planCode: string) =>
+    api.post('/saas-billing/fake/checkout', { plan_code: planCode }),
+};
+
 export default api;

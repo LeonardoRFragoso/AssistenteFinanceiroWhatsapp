@@ -2,10 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.core.database import get_db
-from app.utils.dependencies import get_current_active_user
+from app.utils.dependencies import get_current_active_user, get_current_organization
 from app.services.document_analysis_service import DocumentAnalysisService
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
 from app.core.logging import logger
 from app.models.user import User
+from app.models.organization import Organization
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -14,6 +17,7 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 async def analyze_document(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
     """Analyze a document (image or PDF) and extract financial data.
@@ -51,8 +55,19 @@ async def analyze_document(
 
     logger.info(f"Document analysis requested by user {current_user.id}, type={content_type}, size={len(content)}")
 
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_use_ocr(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=entitlement,
+        )
+
     service = DocumentAnalysisService()
     result = await service.analyze_content(content, content_type)
+
+    await SaaSBillingService(db).increment_usage(org.id, "ocr_documents_analyzed")
 
     logger.info(
         f"Document analysis result for user {current_user.id}: "

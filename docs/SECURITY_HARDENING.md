@@ -1,5 +1,18 @@
 # Security Hardening — PayFlow AI
 
+## SaaS Billing Security (Sprint 12)
+
+- **No real payments**: Fake billing provider is the default. No Stripe, Mercado Pago, or real payment processor is called for SaaS subscriptions. `PAYFLOW_BILLING_PROVIDER=fake` by default.
+- **Entitlement enforcement**: All resource-creating endpoints (charges, OCR, PDF exports, collection rules, team members) check `EntitlementsService` before executing. Denied requests return 403 with reason and limit info — no silent failures.
+- **RBAC on billing management**: Only `owner` and `admin` roles can change plans, cancel, reactivate, or perform fake checkouts. `viewer` and `finance` roles can view subscription and usage but cannot modify.
+- **Usage tracking integrity**: Usage counters increment only after successful resource creation. Failed operations do not increment counters. Counters reset at the start of each billing period.
+- **WhatsApp billing safety**: All billing checks in the WhatsApp webhook are wrapped in try/except to prevent billing failures from blocking the user's WhatsApp experience. If the billing service is unavailable, the message is still processed.
+- **Billing event audit trail**: All billing actions (plan changes, checkouts, cancellations, reactivations) are logged in `BillingEvent` with timestamp, plan code, provider, and metadata.
+- **Default Free subscription**: Every new organization automatically receives a Free plan subscription. No organization can exist without a subscription — `ensure_free_subscription` is called on every billing-related API call.
+- **Sandbox isolation**: Fake checkout and fake webhook endpoints are clearly labeled as sandbox-only. No real payment data is processed or stored.
+- **Multi-tenant billing isolation**: Subscriptions, usage counters, and billing events are all scoped by `organization_id`. No cross-org billing data access is possible.
+- **Admin metrics**: Billing metrics in admin endpoint are read-only and protected by admin authentication.
+
 ## NOT NULL Enforcement & Migration Portability (Sprint 11.2)
 
 - **`organization_id` is NOT NULL**: All 7 org-scoped tables (charges, customers, message_templates, collection_rules, collection_message_logs, recurring_tasks, pending_actions) now enforce `organization_id` as `NOT NULL` at the database level.

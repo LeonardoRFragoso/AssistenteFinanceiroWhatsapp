@@ -8,6 +8,8 @@ from app.core.permissions import require_permission, has_permission
 from app.models.user import User
 from app.models.organization import Organization, OrganizationRole
 from app.services.organization_service import OrganizationService
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
@@ -196,6 +198,12 @@ async def add_member(
     # Cannot add an owner via this endpoint
     if role == OrganizationRole.OWNER:
         raise HTTPException(status_code=400, detail="Cannot add owner via member invitation")
+
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_add_team_member(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=entitlement)
 
     member = await service.add_member(org.id, data.email, role)
     return {

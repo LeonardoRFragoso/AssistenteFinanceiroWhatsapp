@@ -294,6 +294,16 @@ class DemoService:
         org_service = OrganizationService(self.db)
         org = await org_service.ensure_default_organization(user)
 
+        # Assign Professional plan to demo org (sandbox, no real payment)
+        from app.services.saas_billing_service import SaaSBillingService
+        billing = SaaSBillingService(self.db)
+        await billing.seed_plans()
+        await billing.ensure_free_subscription(org.id)
+        try:
+            await billing.change_plan(org.id, "professional")
+        except Exception:
+            pass  # Already has a subscription, ignore
+
         existing_charges = await self.db.execute(
             select(Charge).where(Charge.user_id == user.id)
         )

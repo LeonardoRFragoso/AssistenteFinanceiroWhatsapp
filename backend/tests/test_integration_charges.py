@@ -14,6 +14,7 @@ from app.models.conversation_log import ConversationLog
 from app.models.provider_event import ProviderEvent
 from app.models.pending_action import PendingAction
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
+from app.models.billing import SubscriptionPlan, OrganizationSubscription, UsageCounter, SubscriptionStatus, BillingProvider
 from app.main import app
 from app.providers.provider_factory import get_payment_provider
 from decimal import Decimal
@@ -75,6 +76,16 @@ async def authed_user(test_session):
     ))
     await test_session.commit()
 
+    # Seed billing plans and create Professional subscription for test org
+    from app.services.saas_billing_service import SaaSBillingService
+    billing = SaaSBillingService(test_session)
+    await billing.seed_plans()
+    await billing.ensure_free_subscription(org.id)
+    try:
+        await billing.change_plan(org.id, "professional")
+    except Exception:
+        pass
+
     user._org_id = org.id
     return user
 
@@ -113,6 +124,16 @@ async def other_user(test_session):
         joined_at=datetime.now(timezone.utc),
     ))
     await test_session.commit()
+
+    # Seed billing plans and create Professional subscription for other test org
+    from app.services.saas_billing_service import SaaSBillingService
+    billing = SaaSBillingService(test_session)
+    await billing.seed_plans()
+    await billing.ensure_free_subscription(org.id)
+    try:
+        await billing.change_plan(org.id, "professional")
+    except Exception:
+        pass
 
     user._org_id = org.id
     return user

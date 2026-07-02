@@ -72,6 +72,17 @@ async def authed_org(test_session, authed_user):
     test_session.add(member)
     await test_session.commit()
     await test_session.refresh(org)
+
+    # Seed billing plans and create Professional subscription
+    from app.services.saas_billing_service import SaaSBillingService
+    billing = SaaSBillingService(test_session)
+    await billing.seed_plans()
+    await billing.ensure_free_subscription(org.id)
+    try:
+        await billing.change_plan(org.id, "professional")
+    except Exception:
+        pass
+
     return org
 
 

@@ -57,6 +57,13 @@ class OrganizationService:
         await self.db.commit()
         await self.db.refresh(org)
         logger.info(f"Default organization created for user {user.id}: {org.slug}")
+
+        # Ensure free subscription for the new organization
+        from app.services.saas_billing_service import SaaSBillingService
+        billing = SaaSBillingService(self.db)
+        await billing.seed_plans()
+        await billing.ensure_free_subscription(org.id)
+
         return org
 
     async def list_user_organizations(self, user_id: int) -> List[Dict[str, Any]]:
@@ -169,6 +176,13 @@ class OrganizationService:
         self.db.add(member)
         await self.db.commit()
         await self.db.refresh(org)
+
+        # Ensure free subscription for the new organization
+        from app.services.saas_billing_service import SaaSBillingService
+        billing = SaaSBillingService(self.db)
+        await billing.seed_plans()
+        await billing.ensure_free_subscription(org.id)
+
         return org
 
     async def update_organization(

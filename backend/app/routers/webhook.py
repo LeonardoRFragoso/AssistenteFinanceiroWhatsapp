@@ -25,6 +25,9 @@ from app.utils.webhook_rate_limiter import webhook_rate_limiter
 from app.core.audit_logger import log_webhook_received
 from app.services.plan_limit_service import PlanLimitService
 from app.repositories.subscription_repository import SubscriptionRepository
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
+from app.services.organization_service import OrganizationService
 from decimal import Decimal
 
 router = APIRouter(prefix="/webhook", tags=["Webhook"])
@@ -106,6 +109,29 @@ async def whatsapp_webhook(
                     )
                     return {"status": "error", "message": "Audio transcription failed"}
             elif "image" in content_type or "pdf" in content_type or "application/pdf" in content_type:
+                # SaaS billing: check OCR entitlements
+                try:
+                    user_repo = UserRepository(db)
+                    user = await user_repo.get_by_phone(phone_number)
+                    if user:
+                        org_service = OrganizationService(db)
+                        org = await org_service.ensure_default_organization(user)
+                        billing = SaaSBillingService(db)
+                        await billing.ensure_free_subscription(org.id)
+                        ent_svc = EntitlementsService(db)
+                        ocr_ent = await ent_svc.can_use_ocr(org.id)
+                        if not ocr_ent["allowed"]:
+                            await twilio_service.send_message(
+                                From,
+                                f"⚠️ A análise de documentos (OCR) não está disponível no plano "
+                                f"{ocr_ent.get('plan', 'atual')}. Faça upgrade para o plano Professional "
+                                f"ou superior para usar este recurso."
+                            )
+                            return {"status": "success", "message": "OCR not included in plan"}
+                        await billing.increment_usage(org.id, "ocr_documents_analyzed")
+                except Exception as e:
+                    logger.warning(f"OCR billing check failed: {e}")
+
                 from app.services.document_analysis_service import DocumentAnalysisService
                 doc_service = DocumentAnalysisService()
 
@@ -174,6 +200,27 @@ async def whatsapp_webhook(
             )
             await twilio_service.send_message(From, response_message)
             return {"status": "success", "message": "Subscription inactive"}
+        
+        # SaaS billing: check WhatsApp message limit
+        try:
+            org_service = OrganizationService(db)
+            org = await org_service.ensure_default_organization(user)
+            billing = SaaSBillingService(db)
+            await billing.ensure_free_subscription(org.id)
+            ent_svc = EntitlementsService(db)
+            wa_entitlement = await ent_svc.can_process_whatsapp_message(org.id)
+            if not wa_entitlement["allowed"]:
+                limit_msg = (
+                    f"⚠️ Você atingiu o limite de mensagens do WhatsApp "
+                    f"para o plano {wa_entitlement.get('plan', 'atual')}. "
+                    f"Limite: {wa_entitlement.get('limit', 'N/A')}. "
+                    f"Faça upgrade do seu plano para continuar."
+                )
+                await twilio_service.send_message(From, limit_msg)
+                return {"status": "success", "message": "WhatsApp message limit reached"}
+            await billing.increment_usage(org.id, "whatsapp_messages_processed")
+        except Exception as e:
+            logger.warning(f"Billing check failed for WhatsApp: {e}")
         
         conversation_repo = ConversationRepository(db)
         ai_service = AIService()
@@ -631,6 +678,22 @@ async def handle_create_pix_charge(
             org = await org_service.ensure_default_organization(user)
             org_id = org.id
 
+            # SaaS billing: check charge creation limit
+            try:
+                billing = SaaSBillingService(db)
+                await billing.ensure_free_subscription(org.id)
+                ent_svc = EntitlementsService(db)
+                charge_ent = await ent_svc.can_create_charge(org.id)
+                if not charge_ent["allowed"]:
+                    return (
+                        f"⚠️ Você atingiu o limite de cobranças do plano "
+                        f"{charge_ent.get('plan', 'atual')}. "
+                        f"Limite: {charge_ent.get('limit', 'N/A')}. "
+                        f"Faça upgrade do seu plano para criar mais cobranças."
+                    )
+            except Exception as e:
+                logger.warning(f"Billing check failed for charge creation: {e}")
+
         pending_service = PendingActionService(db)
         action = await pending_service.create_charge_action(
             user_id=user_id,
@@ -666,6 +729,14 @@ async def handle_confirm_pending_action(
         charge = await pending_service.confirm_and_execute(action.id, user_id)
         if not charge:
             return "Não consegui gerar a cobrança. Verifique os dados e tente novamente."
+
+        # SaaS billing: increment usage after successful charge creation
+        try:
+            if charge.organization_id:
+                billing = SaaSBillingService(db)
+                await billing.increment_usage(charge.organization_id, "charges_created")
+        except Exception as e:
+            logger.warning(f"Failed to increment charge usage: {e}")
 
         message = (
             f"✅ *Cobrança criada com sucesso!*\n\n"
