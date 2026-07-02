@@ -1,5 +1,21 @@
 # PayFlow AI — Release Notes
 
+## Sprint 12: SaaS Billing, Plans, Usage Limits & Subscription Sandbox
+
+- **SaaS billing layer**: Subscription plans (Free, Starter, Professional, Business), usage counters, billing events, and a sandboxed subscription management system.
+- **Models**: `SubscriptionPlan`, `OrganizationSubscription`, `UsageCounter`, `BillingEvent` in `billing.py`.
+- **Migration** `j0e1f2g3h4i5`: Creates 4 billing tables. Portable across SQLite and PostgreSQL.
+- **SaaSBillingService**: Plan seeding, subscription management, usage tracking, entitlement checks, fake checkout, event logging.
+- **EntitlementsService**: 10 entitlement checks (charges, customers, templates, recurring tasks, OCR, PDF, analytics, collection rules, team members, WhatsApp messages).
+- **Billing providers**: Abstract `BillingProvider` base, `FakeBillingProvider` for sandbox, factory pattern with `PAYFLOW_BILLING_PROVIDER` env var.
+- **API endpoints** (`/saas-billing`): Plans, subscription, usage, entitlements, change-plan, cancel, reactivate, fake checkout, fake webhook.
+- **Entitlement enforcement**: Charges PDF export, document OCR, collection rules, analytics PDF export, team member limits — all return 403 with clear error messages when limits reached.
+- **WhatsApp billing**: Message processing limit, OCR entitlement check, charge creation limit with usage increment after confirmation. Limit-reached messages sent to users.
+- **Default subscriptions**: New orgs get Free plan automatically. Demo org gets Professional plan.
+- **Admin metrics**: System-metrics endpoint includes subscription counts and usage data.
+- **Frontend**: `BillingSection` component with plan cards, usage meters, change/cancel/reactivate, fake checkout. `saasBillingAPI` client in `api.ts`.
+- **Tests**: 20+ new billing tests. All test fixtures updated with billing plan seeding. 321 backend tests pass. Frontend build passes.
+
 ## Sprint 11.2: Migration Portability & NOT NULL Enforcement
 
 - **Problem**: Alembic migrations used PostgreSQL-specific syntax (`DO $$` blocks, `postgresql.ENUM`, `now()`) that broke SQLite. `organization_id` was nullable with no enforcement.

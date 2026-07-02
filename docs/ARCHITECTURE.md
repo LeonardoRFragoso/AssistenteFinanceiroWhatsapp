@@ -26,22 +26,24 @@ The system operates in **sandbox mode** by default (fake provider). No real fina
 backend/
 ├── app/
 │   ├── core/           # Config, database, security, logging, redis
-│   ├── models/         # SQLAlchemy models (User, Charge, Transaction, etc.)
+│   ├── models/         # SQLAlchemy models (User, Charge, Transaction, billing, etc.)
 │   ├── schemas/        # Pydantic schemas
 │   ├── repositories/   # Data access layer
-│   ├── services/       # Business logic (AIService, ChargeService, etc.)
-│   ├── routers/        # FastAPI endpoints
+│   ├── services/       # Business logic (AIService, ChargeService, SaaSBillingService, EntitlementsService, etc.)
+│   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, etc.)
 │   ├── providers/      # Payment providers (fake, mercado_pago)
+│   ├── billing_providers/  # SaaS billing providers (base, fake, factory)
 │   ├── integrations/   # External integrations (Twilio)
 │   ├── jobs/           # Background jobs (reminder_scheduler)
 │   └── utils/          # Dependencies, middleware
-├── scripts/            # Utility scripts (seed_demo_data.py)
+├── scripts/            # Utility scripts (seed_demo_data.py, audit_multitenant_integrity.py)
 ├── tests/              # Integration tests
 └── alembic/            # Database migrations
 
 frontend/
 ├── pages/              # Next.js pages (index, login, dashboard, etc.)
-├── services/           # API client
+├── components/         # React components (BillingSection, OrganizationSection, etc.)
+├── services/           # API client (api.ts, adminAPI.ts)
 ├── utils/              # Error handling
 └── styles/             # TailwindCSS
 ```
@@ -122,11 +124,83 @@ GET /charges/export.csv?status=overdue&start_date=...
 GET /charges/export.pdf?status=pending&end_date=...
     │
     ▼
+EntitlementsService.can_export_pdf(org_id)
+    │
+    ├── If not allowed → 403 Forbidden
+    │
+    ▼
 ChargeService.get_charges_paginated()
     │
     ├── Applies same filters as dashboard (derived statuses, date range)
+    ├── SaaSBillingService.increment_usage(org_id, "pdf_exports_generated")
     ├── CSV: generates CSV with derived_status column
     └── PDF: generates PDF report with summary table + charge table
+```
+
+### 5. SaaS Billing & Entitlements Flow
+
+```
+Organization created
+    │
+    ▼
+OrganizationService.ensure_default_organization()
+    │
+    ├── SaaSBillingService.ensure_free_subscription(org_id)
+    └── Organization gets Free plan automatically
+
+User action (create charge, OCR, export, etc.)
+    │
+    ▼
+EntitlementsService.can_<action>(org_id)
+    │
+    ├── Checks plan limits and feature flags
+    ├── If denied → 403 with reason + limit info
+    │
+    ▼
+Action executes successfully
+    │
+    ▼
+SaaSBillingService.increment_usage(org_id, field)
+    │
+    └── UsageCounter incremented for current billing period
+
+User changes plan via dashboard
+    │
+    ▼
+POST /saas-billing/subscription/change-plan
+    │
+    ├── RBAC: owner/admin only
+    ├── SaaSBillingService.change_plan(org_id, plan_code)
+    ├── BillingEvent recorded
+    └── New plan active immediately (sandbox)
+```
+
+### 6. WhatsApp Billing Flow
+
+```
+Incoming WhatsApp message
+    │
+    ▼
+EntitlementsService.can_process_whatsapp_message(org_id)
+    │
+    ├── If limit reached → send limit message, return
+    ├── Increment whatsapp_messages_processed
+    │
+    ▼
+If document/image attached:
+    │
+    ├── EntitlementsService.can_use_ocr(org_id)
+    ├── If not included → send upgrade message, return
+    ├── Increment ocr_documents_analyzed
+    │
+    ▼
+If charge creation intent:
+    │
+    ├── EntitlementsService.can_create_charge(org_id)
+    ├── If limit reached → send limit message, return
+    │
+    ▼
+Charge confirmed → increment charges_created
 ```
 
 ## Data Models
@@ -148,6 +222,13 @@ ChargeService.get_charges_paginated()
 - **ProviderEvent**: webhook event log from payment provider
 - **ChargeReminderLog**: reminder sent log
 - **ChargeDeliveryLog**: delivery confirmation log
+
+### SaaS Billing Models (Sprint 12)
+
+- **SubscriptionPlan**: code, name, price_monthly, limits (charges, customers, team members, templates, recurring tasks, WhatsApp messages), feature flags (OCR, PDF, analytics, collection rules, WhatsApp intelligence)
+- **OrganizationSubscription**: organization_id (unique), plan_id, status (trialing/active/past_due/cancelled/expired), billing_provider, provider_subscription_id, current_period_start/end, cancel_at_period_end
+- **UsageCounter**: organization_id, period_start/end, counters for charges_created, customers_created, templates_created, recurring_tasks_created, ocr_documents_analyzed, pdf_exports_generated, whatsapp_messages_processed, collection_followups_generated
+- **BillingEvent**: organization_id, event_type, plan_code, amount, provider, metadata (JSON), timestamp
 
 ### Derived Status
 

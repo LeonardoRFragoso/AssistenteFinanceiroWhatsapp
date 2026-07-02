@@ -27,6 +27,9 @@ ORG_SCOPED_TABLES = [
     "collection_message_logs",
     "recurring_tasks",
     "pending_actions",
+    "organization_subscriptions",
+    "usage_counters",
+    "billing_events",
 ]
 
 

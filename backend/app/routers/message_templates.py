@@ -4,6 +4,8 @@ from app.core.database import get_db
 from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.services.message_template_service import MessageTemplateService
 from app.core.permissions import has_permission
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
 from app.models.organization import Organization, OrganizationRole
 from app.schemas.message_template import (
     MessageTemplateCreate,
@@ -42,9 +44,15 @@ async def create_template(
     """Create a new message template."""
     if not has_permission(role, "manage_templates"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing templates")
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_create_template(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=entitlement)
     service = MessageTemplateService(db)
     try:
         template = await service.create_template(current_user.id, data, organization_id=org.id)
+        await SaaSBillingService(db).increment_usage(org.id, "templates_created")
         return template
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

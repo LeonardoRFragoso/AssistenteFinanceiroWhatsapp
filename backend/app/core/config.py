@@ -64,7 +64,13 @@ class Settings(BaseSettings):
     
     # Webhook rate limiting
     WEBHOOK_RATE_LIMIT_PER_MINUTE: int = 60
-    
+
+    # SaaS Billing (separate from payment provider for charges)
+    PAYFLOW_BILLING_PROVIDER: str = "fake"
+    STRIPE_SANDBOX_SECRET_KEY: Optional[str] = None
+    STRIPE_SANDBOX_WEBHOOK_SECRET: Optional[str] = None
+    MERCADO_PAGO_BILLING_SANDBOX_TOKEN: Optional[str] = None
+
     class Config:
         env_file = ".env"
         case_sensitive = True

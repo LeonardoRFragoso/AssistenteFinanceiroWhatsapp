@@ -6,6 +6,8 @@ from app.core.config import settings
 from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.services.recurring_task_service import RecurringTaskService
 from app.core.permissions import has_permission
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
 from app.models.organization import Organization, OrganizationRole
 from app.schemas.recurring_task import (
     RecurringTaskCreate,
@@ -32,8 +34,14 @@ async def create_recurring_task(
     """
     if not has_permission(role, "manage_charges"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing recurring tasks")
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_create_recurring_task(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=entitlement)
     service = RecurringTaskService(db)
     task = await service.create_task(current_user.id, task_data, organization_id=org.id)
+    await SaaSBillingService(db).increment_usage(org.id, "recurring_tasks_created")
     return task
 
 

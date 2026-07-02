@@ -18,6 +18,10 @@ from app.models.message_template import MessageTemplate, MessageTone
 from app.models.collection_rule import CollectionRule, TriggerType
 from app.models.collection_message_log import CollectionMessageLog, CollectionMessageStatus
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
+from app.models.billing import (
+    SubscriptionPlan, OrganizationSubscription, UsageCounter, BillingEvent,
+    SubscriptionStatus, BillingProvider,
+)
 
 __all__ = [
     "User",
@@ -53,4 +57,10 @@ __all__ = [
     "Organization",
     "OrganizationMember",
     "OrganizationRole",
+    "SubscriptionPlan",
+    "OrganizationSubscription",
+    "UsageCounter",
+    "BillingEvent",
+    "SubscriptionStatus",
+    "BillingProvider",
 ]

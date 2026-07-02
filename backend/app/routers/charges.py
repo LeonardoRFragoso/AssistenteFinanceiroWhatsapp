@@ -19,6 +19,8 @@ from app.utils.dependencies import get_current_active_user, get_current_organiza
 from app.utils.user_rate_limiter import charges_limiter, exports_limiter
 from app.core.audit_logger import log_charge_created, log_export
 from app.core.permissions import require_permission, has_permission
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
 from app.models.user import User
 from app.models.charge import ChargeStatus
 from app.models.organization import Organization, OrganizationRole
@@ -181,6 +183,11 @@ async def export_charges_pdf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your role does not allow exporting data",
         )
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_export_pdf(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(status_code=403, detail=entitlement)
     """Export the authenticated user's charges as a PDF report."""
     status = _validate_status(status)
     from reportlab.lib.pagesizes import A4
@@ -422,8 +429,17 @@ async def create_charge(
             detail="Your role does not allow creating charges",
         )
     service = ChargeService(db)
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_create_charge(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=entitlement,
+        )
     charge = await service.create_charge(current_user.id, charge_data, organization_id=org.id)
     log_charge_created(current_user.id, charge.id, charge.provider, str(charge.amount))
+    await SaaSBillingService(db).increment_usage(org.id, "charges_created")
     return charge
 
 

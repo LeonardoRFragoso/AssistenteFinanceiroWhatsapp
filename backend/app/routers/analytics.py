@@ -9,6 +9,8 @@ from app.core.database import get_db
 from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.services.charge_analytics_service import ChargeAnalyticsService
 from app.core.permissions import has_permission
+from app.services.entitlements_service import EntitlementsService
+from app.services.saas_billing_service import SaaSBillingService
 from app.models.user import User
 from app.models.organization import Organization, OrganizationRole
 
@@ -199,6 +201,11 @@ async def export_analytics_pdf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your role does not allow exporting data",
         )
+    ent_svc = EntitlementsService(db)
+    await SaaSBillingService(db).ensure_free_subscription(org.id)
+    entitlement = await ent_svc.can_export_pdf(org.id)
+    if not entitlement["allowed"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=entitlement)
     service = ChargeAnalyticsService(db)
     overview = await service.get_overview(current_user.id, org.id, start_date, end_date)
     trends = await service.get_monthly_trends(current_user.id, org.id, months=6)

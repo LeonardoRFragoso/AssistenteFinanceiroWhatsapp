@@ -6,6 +6,7 @@ import RecurringTasksSection from '../components/RecurringTasksSection';
 import CustomerIntelligenceSection from '../components/CustomerIntelligenceSection';
 import AdvancedAnalyticsSection from '../components/AdvancedAnalyticsSection';
 import OrganizationSection from '../components/OrganizationSection';
+import BillingSection from '../components/BillingSection';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
@@ -854,6 +855,9 @@ export default function Dashboard() {
 
         {/* Organization & Members Section */}
         <OrganizationSection />
+
+        {/* SaaS Billing & Plans Section */}
+        <BillingSection />
 
         {/* Customer Intelligence & Collection Section */}
         <CustomerIntelligenceSection />

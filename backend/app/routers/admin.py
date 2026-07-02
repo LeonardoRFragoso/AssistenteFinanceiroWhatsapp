@@ -419,6 +419,40 @@ async def get_system_metrics(
         total_reminders = (await db.execute(select(func.count(ChargeReminderLog.id)))).scalar_one()
         total_delivery_logs = (await db.execute(select(func.count(ChargeDeliveryLog.id)))).scalar_one()
 
+        # Billing metrics
+        from app.models.billing import SubscriptionPlan, OrganizationSubscription, UsageCounter
+        from app.models.organization import Organization as OrgModel
+        total_orgs = (await db.execute(select(func.count(OrgModel.id)))).scalar_one()
+        total_subscriptions = (await db.execute(select(func.count(OrganizationSubscription.id)))).scalar_one()
+        active_subscriptions = (await db.execute(
+            select(func.count(OrganizationSubscription.id)).where(
+                OrganizationSubscription.status == "active"
+            )
+        )).scalar_one()
+        trialing_subscriptions = (await db.execute(
+            select(func.count(OrganizationSubscription.id)).where(
+                OrganizationSubscription.status == "trialing"
+            )
+        )).scalar_one()
+        cancelled_subscriptions = (await db.execute(
+            select(func.count(OrganizationSubscription.id)).where(
+                OrganizationSubscription.status == "cancelled"
+            )
+        )).scalar_one()
+
+        # Subscriptions per plan
+        plan_counts_result = await db.execute(
+            select(SubscriptionPlan.code, func.count(OrganizationSubscription.id))
+            .outerjoin(OrganizationSubscription, OrganizationSubscription.plan_id == SubscriptionPlan.id)
+            .group_by(SubscriptionPlan.code)
+        )
+        plan_counts = {row[0]: row[1] for row in plan_counts_result.all()}
+
+        # Total usage this period
+        total_charges_created_usage = (await db.execute(
+            select(func.sum(UsageCounter.charges_created))
+        )).scalar() or 0
+
         uptime_seconds = time_module.time() - _start_time
 
         return {
@@ -432,6 +466,15 @@ async def get_system_metrics(
             "total_reminders_sent": total_reminders,
             "total_delivery_logs": total_delivery_logs,
             "uptime_seconds": round(uptime_seconds, 2),
+            "billing": {
+                "total_organizations": total_orgs,
+                "total_subscriptions": total_subscriptions,
+                "active_subscriptions": active_subscriptions,
+                "trialing_subscriptions": trialing_subscriptions,
+                "cancelled_subscriptions": cancelled_subscriptions,
+                "subscriptions_per_plan": plan_counts,
+                "total_charges_created_this_period": total_charges_created_usage,
+            },
         }
 
     except Exception as e:
