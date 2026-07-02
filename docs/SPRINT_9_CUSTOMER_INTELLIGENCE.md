@@ -125,3 +125,36 @@ alembic upgrade head
 ```
 
 Migration ID: `a1b2c3d4e5f6` — Cria 4 novas tabelas: `customers`, `message_templates`, `collection_rules`, `collection_message_logs`.
+
+## E2E Coverage (Sprint 9.1)
+
+Sprint 9.1 adicionou 8 novos cenários E2E Playwright cobrindo Customer Intelligence:
+
+- **Customer Intelligence section aparece** — seção visível no dashboard
+- **Aba Clientes ativa por padrão** — search input visível
+- **Listagem de clientes ou empty state** — table ou mensagem controlada
+- **Busca de clientes** — input aceita texto e Enter
+- **Aba Templates** — conteúdo ou empty state
+- **Preview de template** — botão funciona quando templates existem
+- **Aba Régua de Cobrança + não-auto-envio** — headings visíveis, warning presente, sem botão "Enviar"
+- **QR Code sandbox modal + exports** — modal abre/fecha, CSV e PDF funcionam
+
+Testes Sprint 9 (11-18) usam **serial mode** com login compartilhado para reduzir carga no backend.
+
+### data-testids adicionados
+
+- `customer-intelligence-section` — container da seção
+- `customers-tab` — botão aba Clientes
+- `templates-tab` — botão aba Templates
+- `collection-rules-tab` — botão aba Régua de Cobrança
+- `customer-search-input` — input de busca de clientes
+- `message-template-preview-button` — botão de prévia de template
+- `qr-code-modal` — modal de QR Code sandbox
+
+### Screenshots gerados
+
+- `docs/assets/customer-intelligence.png`
+- `docs/assets/message-templates.png`
+- `docs/assets/collection-rules.png`
+
+**Total E2E: 18 cenários demo.spec + 7 cenários screenshots.spec = 25 testes Playwright**

@@ -88,7 +88,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
 
 ## Test Scenarios
 
-`frontend/e2e/demo.spec.ts` covers 10 scenarios:
+`frontend/e2e/demo.spec.ts` covers 18 scenarios:
 
 1. **Landing page loads** — Verifies h1 is visible
 2. **Demo login button visible** — Checks "Entrar na Demo" button on landing
@@ -100,6 +100,30 @@ NEXT_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
 8. **Search by customer** — Fills search input and clicks "Buscar"
 9. **Export CSV** — Clicks CSV export button
 10. **Export PDF** — Clicks PDF export button
+11. **Customer Intelligence section appears** — Verifies section heading is visible (Sprint 9)
+12. **Customers tab active by default** — Verifies search input is visible on customers tab (Sprint 9)
+13. **Customers listing or empty state** — Verifies table or empty state message is shown (Sprint 9)
+14. **Customer search input accepts text** — Fills search and presses Enter (Sprint 9)
+15. **Templates tab shows content or empty state** — Clicks templates tab, verifies content (Sprint 9)
+16. **Template preview button works** — Clicks preview button if templates exist, verifies rendered text (Sprint 9)
+17. **Collection rules tab: content, empty state, and no auto-send** — Clicks collection tab, verifies headings, warning, and no "Enviar" button (Sprint 9)
+18. **QR Code sandbox modal and exports work** — Opens QR modal, verifies sandbox warning, closes, exports CSV and PDF (Sprint 9)
+
+Sprint 9 tests (11-18) use **serial mode** with a shared login session to reduce backend load.
+
+### data-testid attributes
+
+The following `data-testid` attributes are used for stable E2E selectors:
+
+| data-testid | Location | Purpose |
+|---|---|---|
+| `customer-intelligence-section` | CustomerIntelligenceSection container | Section visibility |
+| `customers-tab` | Tab button | Switch to customers tab |
+| `templates-tab` | Tab button | Switch to templates tab |
+| `collection-rules-tab` | Tab button | Switch to collection rules tab |
+| `customer-search-input` | Search input | Customer search field |
+| `message-template-preview-button` | Preview button | Template preview rendering |
+| `qr-code-modal` | QR Code modal overlay | Sandbox QR modal |
 
 ### Test strategy
 

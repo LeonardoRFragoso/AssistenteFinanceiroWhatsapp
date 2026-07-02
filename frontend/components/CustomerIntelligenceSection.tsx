@@ -154,7 +154,7 @@ export default function CustomerIntelligenceSection() {
   const goodPayers = customers.filter(c => c.operational_status === 'good_payer').length;
 
   return (
-    <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div data-testid="customer-intelligence-section" className="mt-8 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-teal-600" />
@@ -164,6 +164,7 @@ export default function CustomerIntelligenceSection() {
 
       <div className="flex border-b border-gray-200 dark:border-gray-700">
         <button
+          data-testid="customers-tab"
           onClick={() => setActiveTab('customers')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'customers'
@@ -174,6 +175,7 @@ export default function CustomerIntelligenceSection() {
           <Users className="w-4 h-4 inline mr-1" /> Clientes
         </button>
         <button
+          data-testid="templates-tab"
           onClick={() => setActiveTab('templates')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'templates'
@@ -184,6 +186,7 @@ export default function CustomerIntelligenceSection() {
           <MessageSquare className="w-4 h-4 inline mr-1" /> Templates
         </button>
         <button
+          data-testid="collection-rules-tab"
           onClick={() => setActiveTab('collection')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'collection'
@@ -225,6 +228,7 @@ export default function CustomerIntelligenceSection() {
 
             <div className="flex gap-2 mb-4">
               <input
+                data-testid="customer-search-input"
                 type="text"
                 placeholder="Buscar por nome ou telefone..."
                 value={customerSearch}
@@ -365,6 +369,7 @@ export default function CustomerIntelligenceSection() {
                       </div>
                       <div className="flex gap-2">
                         <button
+                          data-testid="message-template-preview-button"
                           onClick={() => handlePreviewTemplate(t.id)}
                           className="text-xs px-3 py-1 bg-teal-50 dark:bg-teal-900/20 text-teal-600 rounded hover:bg-teal-100"
                         >

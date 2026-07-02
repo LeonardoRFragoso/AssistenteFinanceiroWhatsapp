@@ -138,3 +138,14 @@
 - **60 novos testes** — CustomerService (16), MessageTemplateService (13), CollectionService (13), WhatsApp intents (11), Explicit confirmation (2), No banking operations (2), Outros (3)
 - **Resultado final: 234 passed, 0 failed, 0 errors**
 - **Documentação** — `SPRINT_9_CUSTOMER_INTELLIGENCE.md`
+
+## Sprint 9.1: E2E Coverage for Customer Intelligence
+
+- **8 novos cenários E2E** em `demo.spec.ts` cobrindo Customer Intelligence, Templates, Régua de Cobrança, QR Code sandbox, e exports
+- **3 novos screenshots** em `screenshots.spec.ts`: customer-intelligence.png, message-templates.png, collection-rules.png
+- **7 data-testids adicionados** — customer-intelligence-section, customers-tab, templates-tab, collection-rules-tab, customer-search-input, message-template-preview-button, qr-code-modal
+- **Testes resilientes** — empty state controlado, sem seletores frágeis, fallback gracioso quando não há dados
+- **Serial mode** — Sprint 9 tests (11-18) usam login compartilhado via beforeAll para reduzir carga no backend
+- **Verificação de não-auto-envio** — teste E2E confirma ausência de botão "Enviar" e presença de warning de confirmação explícita
+- **Total E2E: 25 testes Playwright** (18 demo + 7 screenshots)
+- **Documentação** — E2E_TESTING.md e SPRINT_9 atualizados
