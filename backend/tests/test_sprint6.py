@@ -8,6 +8,7 @@ from app.models import User, Charge
 from app.models.charge import ChargeStatus
 from app.models.subscription import Subscription
 from app.models.provider_event import ProviderEvent
+from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.main import app
 from decimal import Decimal
 from datetime import date, datetime, timezone
@@ -50,6 +51,28 @@ async def authed_user(test_session):
     await test_session.commit()
 
     return user
+
+
+@pytest_asyncio.fixture
+async def authed_org(test_session, authed_user):
+    org = Organization(
+        name="Test Org",
+        slug=f"test-org-{authed_user.id}",
+        owner_user_id=authed_user.id,
+    )
+    test_session.add(org)
+    await test_session.flush()
+    member = OrganizationMember(
+        organization_id=org.id,
+        user_id=authed_user.id,
+        role=OrganizationRole.OWNER,
+        active=True,
+        joined_at=datetime.now(timezone.utc),
+    )
+    test_session.add(member)
+    await test_session.commit()
+    await test_session.refresh(org)
+    return org
 
 
 @pytest_asyncio.fixture
@@ -237,9 +260,10 @@ class TestAdminSystemMetrics:
         assert resp.status_code in (401, 403)
 
     @pytest.mark.asyncio
-    async def test_system_metrics_admin_ok(self, client, admin_headers, test_session, authed_user):
+    async def test_system_metrics_admin_ok(self, client, admin_headers, test_session, authed_user, authed_org):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_org.id,
             customer_name="Test Charge",
             amount=Decimal("100.00"),
             provider="fake",

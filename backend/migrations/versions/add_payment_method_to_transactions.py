@@ -14,25 +14,30 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Criar o enum apenas se não existir
-    op.execute("""
-        DO $$ BEGIN
-            CREATE TYPE paymentmethod AS ENUM ('conta_corrente', 'cartao_credito', 'cartao_debito', 'pix', 'dinheiro', 'outros');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """)
-    
-    # Adicionar a coluna apenas se não existir
-    op.execute("""
-        DO $$ BEGIN
-            ALTER TABLE transactions ADD COLUMN payment_method paymentmethod NOT NULL DEFAULT 'conta_corrente'::paymentmethod;
-        EXCEPTION
-            WHEN duplicate_column THEN null;
-        END $$;
-    """)
+    bind = op.get_bind()
+    is_pg = bind.dialect.name == 'postgresql'
+
+    if is_pg:
+        op.execute("""
+            DO $$ BEGIN
+                CREATE TYPE paymentmethod AS ENUM ('conta_corrente', 'cartao_credito', 'cartao_debito', 'pix', 'dinheiro', 'outros');
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        """)
+        op.execute("""
+            DO $$ BEGIN
+                ALTER TABLE transactions ADD COLUMN payment_method paymentmethod NOT NULL DEFAULT 'conta_corrente'::paymentmethod;
+            EXCEPTION
+                WHEN duplicate_column THEN null;
+            END $$;
+        """)
+    else:
+        op.add_column('transactions', sa.Column('payment_method', sa.String(20), nullable=False, server_default='conta_corrente'))
 
 
 def downgrade() -> None:
     op.drop_column('transactions', 'payment_method')
-    op.execute("DROP TYPE IF EXISTS paymentmethod")
+    bind = op.get_bind()
+    if bind.dialect.name == 'postgresql':
+        op.execute("DROP TYPE IF EXISTS paymentmethod")

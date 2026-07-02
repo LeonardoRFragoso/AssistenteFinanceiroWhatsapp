@@ -261,7 +261,7 @@ class TestRecurringTaskIsolation:
         assert len(my_tasks) == 1
         assert my_tasks[0].title == "User A task"
 
-    async def test_next_run_at_updated_after_execution(self, db_session, sample_user):
+    async def test_next_run_at_updated_after_execution(self, db_session, sample_user, sample_organization):
         """After execution, next_run_at should be updated to the future."""
         from app.models.recurring_task import RecurringTask, RecurrenceType
         from datetime import datetime, timezone, timedelta
@@ -269,6 +269,7 @@ class TestRecurringTaskIsolation:
         # Create a task that's due now
         task = RecurringTask(
             user_id=sample_user.id,
+            organization_id=sample_organization.id,
             title="Due task",
             recurrence_type=RecurrenceType.DAILY,
             next_run_at=datetime.now(timezone.utc) - timedelta(hours=1),
@@ -293,13 +294,14 @@ class TestRecurringTaskIsolation:
         await db_session.refresh(task)
         assert task.next_run_at > original_next_run
 
-    async def test_execute_task_does_not_execute_payments(self, db_session, sample_user):
+    async def test_execute_task_does_not_execute_payments(self, db_session, sample_user, sample_organization):
         """execute_task should only send a reminder, never create charges or payments."""
         from app.models.recurring_task import RecurringTask, RecurrenceType
         from datetime import datetime, timezone, timedelta
 
         task = RecurringTask(
             user_id=sample_user.id,
+            organization_id=sample_organization.id,
             title="Reminder task",
             description="Just a reminder",
             recurrence_type=RecurrenceType.DAILY,

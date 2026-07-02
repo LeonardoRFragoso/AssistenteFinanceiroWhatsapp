@@ -17,20 +17,29 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        """
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deliverystatus') THEN
-                CREATE TYPE deliverystatus AS ENUM ('sent', 'failed', 'simulated');
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deliverychannel') THEN
-                CREATE TYPE deliverychannel AS ENUM ('whatsapp', 'sms', 'email');
-            END IF;
-        END $$;
-        """,
-        execution_options={"autocommit": True}
-    )
+    bind = op.get_bind()
+    is_pg = bind.dialect.name == 'postgresql'
+
+    if is_pg:
+        op.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deliverystatus') THEN
+                    CREATE TYPE deliverystatus AS ENUM ('sent', 'failed', 'simulated');
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deliverychannel') THEN
+                    CREATE TYPE deliverychannel AS ENUM ('whatsapp', 'sms', 'email');
+                END IF;
+            END $$;
+            """,
+            execution_options={"autocommit": True}
+        )
+        channel_col = postgresql.ENUM('whatsapp', 'sms', 'email', name='deliverychannel', create_type=False)
+        delivery_status_col = postgresql.ENUM('sent', 'failed', 'simulated', name='deliverystatus', create_type=False)
+    else:
+        channel_col = sa.String(20)
+        delivery_status_col = sa.String(20)
 
     op.create_table(
         'charge_delivery_logs',
@@ -38,11 +47,11 @@ def upgrade() -> None:
         sa.Column('charge_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('customer_phone', sa.String(20), nullable=True),
-        sa.Column('channel', postgresql.ENUM('whatsapp', 'sms', 'email', name='deliverychannel', create_type=False), nullable=False),
-        sa.Column('status', postgresql.ENUM('sent', 'failed', 'simulated', name='deliverystatus', create_type=False), nullable=False),
+        sa.Column('channel', channel_col, nullable=False),
+        sa.Column('status', delivery_status_col, nullable=False),
         sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('error_message', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
         sa.ForeignKeyConstraint(['charge_id'], ['charges.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
@@ -53,9 +62,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    is_pg = bind.dialect.name == 'postgresql'
+
     op.drop_index(op.f('ix_charge_delivery_logs_user_id'), table_name='charge_delivery_logs')
     op.drop_index(op.f('ix_charge_delivery_logs_charge_id'), table_name='charge_delivery_logs')
     op.drop_index(op.f('ix_charge_delivery_logs_id'), table_name='charge_delivery_logs')
     op.drop_table('charge_delivery_logs')
-    op.execute("DROP TYPE IF EXISTS deliverystatus")
-    op.execute("DROP TYPE IF EXISTS deliverychannel")
+    if is_pg:
+        op.execute("DROP TYPE IF EXISTS deliverystatus")
+        op.execute("DROP TYPE IF EXISTS deliverychannel")

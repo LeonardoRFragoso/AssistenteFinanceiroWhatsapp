@@ -39,23 +39,10 @@ from app.models.user import User
 
 
 @pytest_asyncio.fixture
-async def second_user(db_session):
-    user = User(
-        name="Maria Teste",
-        email="maria@example.com",
-        hashed_password="hashed",
-        phone_number="+5511888888888"
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-    return user
-
-
-@pytest_asyncio.fixture
-async def sample_charge(db_session, sample_user):
+async def sample_charge(db_session, sample_user, sample_organization):
     charge = Charge(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         customer_name="João Silva",
         customer_phone="11999999999",
         amount=Decimal("150.00"),
@@ -75,9 +62,10 @@ async def sample_charge(db_session, sample_user):
 
 
 @pytest_asyncio.fixture
-async def paid_charge(db_session, sample_user):
+async def paid_charge(db_session, sample_user, sample_organization):
     charge = Charge(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         customer_name="João Silva",
         customer_phone="11999999999",
         amount=Decimal("200.00"),
@@ -215,12 +203,13 @@ class TestCustomerService:
         assert summary["total_charges_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_customer_summary_frequent_late(self, db_session, sample_user):
+    async def test_customer_summary_frequent_late(self, db_session, sample_user, sample_organization):
         service = CustomerService(db_session)
         customer = await service.get_or_create_customer(sample_user.id, "Atrasado", "999")
         for i in range(3):
             charge = Charge(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 customer_name="Atrasado",
                 customer_phone="999",
                 amount=Decimal(f"{100 + i}.00"),

@@ -1,5 +1,18 @@
 # PayFlow AI — Release Notes
 
+## Sprint 11.2: Migration Portability & NOT NULL Enforcement
+
+- **Problem**: Alembic migrations used PostgreSQL-specific syntax (`DO $$` blocks, `postgresql.ENUM`, `now()`) that broke SQLite. `organization_id` was nullable with no enforcement.
+- **Fix**: All migrations now portable across SQLite and PostgreSQL. `organization_id` is `NOT NULL` on all org-scoped tables.
+- **Migration portability**: Replaced `now()` with `CURRENT_TIMESTAMP`. Wrapped `DO $$` blocks in dialect checks. Used `sa.String(20)` instead of `postgresql.ENUM` for non-PG dialects. Used `batch_alter_table` for FK constraints in SQLite.
+- **Migration** `i9d0e1f2g3h4`: Sets `organization_id` to `NOT NULL` on all 7 org-scoped tables. Deletes any remaining NULL records first (safety net after backfill).
+- **Models updated**: All 7 org-scoped models now have `nullable=False` on `organization_id`.
+- **Auto-resolution**: Services auto-resolve `organization_id` from user's default org when not explicitly provided (`org_resolver.py`).
+- **Demo seed fix**: All demo charges now include `organization_id`.
+- **Audit script**: `scripts/audit_multitenant_integrity.py` checks for NULL and invalid `organization_id` records.
+- **Admin endpoint**: `GET /admin/multitenant-health` exposes multi-tenant integrity status.
+- **Tests**: 289 backend tests pass. Alembic `upgrade head` works on SQLite. Single head confirmed.
+
 ## Sprint 11.1: Multi-Tenant Isolation Hardening
 
 - **Problem**: Sprint 11 added `organization_id` columns but routers/services still filtered only by `user_id`, allowing cross-org data leakage.

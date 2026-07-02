@@ -10,6 +10,7 @@ from app.schemas.message_template import (
     AGGRESSIVE_WORDS,
 )
 from app.core.logging import logger
+from app.utils.org_resolver import resolve_organization_id
 
 
 class MessageTemplateService:
@@ -29,6 +30,7 @@ class MessageTemplateService:
         return list(result.scalars().all())
 
     async def create_template(self, user_id: int, data: MessageTemplateCreate, organization_id: Optional[int] = None) -> MessageTemplate:
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         self._validate_placeholders(data.template_text)
         template = MessageTemplate(
             user_id=user_id,

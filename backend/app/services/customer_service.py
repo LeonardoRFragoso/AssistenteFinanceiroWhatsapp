@@ -6,6 +6,7 @@ from decimal import Decimal
 from app.models.customer import Customer, CustomerStatus
 from app.models.charge import Charge, ChargeStatus
 from app.core.logging import logger
+from app.utils.org_resolver import resolve_organization_id
 
 
 class CustomerService:
@@ -28,6 +29,7 @@ class CustomerService:
         organization_id: Optional[int] = None,
     ) -> Customer:
         """Find or create a customer by normalized name/phone for the user."""
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         normalized_name = name.strip().lower()
 
         query = select(Customer).where(

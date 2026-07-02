@@ -15,6 +15,13 @@ branch_labels = None
 depends_on = None
 
 
+def _add_org_column(table_name: str) -> None:
+    """Add organization_id column using batch_alter_table for SQLite compatibility."""
+    with op.batch_alter_table(table_name) as batch_op:
+        batch_op.add_column(sa.Column('organization_id', sa.Integer(), nullable=True))
+    op.create_index(f'ix_{table_name}_organization_id', table_name, ['organization_id'], unique=False)
+
+
 def upgrade() -> None:
     op.create_table(
         'organizations',
@@ -26,8 +33,8 @@ def upgrade() -> None:
         sa.Column('email', sa.String(255), nullable=True),
         sa.Column('phone', sa.String(20), nullable=True),
         sa.Column('active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
     op.create_table(
@@ -40,27 +47,24 @@ def upgrade() -> None:
         sa.Column('invited_email', sa.String(255), nullable=True),
         sa.Column('invited_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('joined_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
-    op.add_column('charges', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
-    op.add_column('customers', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
-    op.add_column('message_templates', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
-    op.add_column('collection_rules', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
-    op.add_column('collection_message_logs', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
-    op.add_column('recurring_tasks', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
-    op.add_column('pending_actions', sa.Column('organization_id', sa.Integer(), sa.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True))
+    _add_org_column('charges')
+    _add_org_column('customers')
+    _add_org_column('message_templates')
+    _add_org_column('collection_rules')
+    _add_org_column('collection_message_logs')
+    _add_org_column('recurring_tasks')
+    _add_org_column('pending_actions')
 
 
 def downgrade() -> None:
-    op.drop_column('pending_actions', 'organization_id')
-    op.drop_column('recurring_tasks', 'organization_id')
-    op.drop_column('collection_message_logs', 'organization_id')
-    op.drop_column('collection_rules', 'organization_id')
-    op.drop_column('message_templates', 'organization_id')
-    op.drop_column('customers', 'organization_id')
-    op.drop_column('charges', 'organization_id')
+    for table in ['pending_actions', 'recurring_tasks', 'collection_message_logs', 'collection_rules', 'message_templates', 'customers', 'charges']:
+        op.drop_index(f'ix_{table}_organization_id', table_name=table)
+        with op.batch_alter_table(table) as batch_op:
+            batch_op.drop_column('organization_id')
 
     op.drop_table('organization_members')
     op.drop_table('organizations')

@@ -11,6 +11,7 @@ from app.providers.provider_factory import get_payment_provider
 from app.schemas.charge import ChargeCreate, ChargeSummaryResponse
 from app.core.logging import logger
 from app.integrations.twilio_whatsapp import TwilioWhatsAppService
+from app.utils.org_resolver import resolve_organization_id
 
 
 class ChargeService:
@@ -23,6 +24,7 @@ class ChargeService:
 
     async def create_charge(self, user_id: int, data: ChargeCreate, organization_id: Optional[int] = None) -> Charge:
         """Create a charge with the configured provider and persist it."""
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         provider_name = data.provider or self.provider.name
 
         # If provider is explicit, fetch that provider instance for this call only.
