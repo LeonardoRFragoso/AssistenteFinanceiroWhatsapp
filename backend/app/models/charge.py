@@ -18,6 +18,7 @@ class Charge(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     customer_name = Column(String(255), nullable=False)
     customer_phone = Column(String(20), nullable=True)
     amount = Column(Numeric(10, 2), nullable=False)

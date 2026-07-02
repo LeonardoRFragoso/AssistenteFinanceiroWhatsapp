@@ -71,10 +71,12 @@ class ChargeRepository:
         description: Optional[str] = None,
         customer_phone: Optional[str] = None,
         due_date: Optional[date] = None,
-        status: ChargeStatus = ChargeStatus.PENDING
+        status: ChargeStatus = ChargeStatus.PENDING,
+        organization_id: Optional[int] = None,
     ) -> Charge:
         charge = Charge(
             user_id=user_id,
+            organization_id=organization_id,
             customer_name=customer_name,
             customer_phone=customer_phone,
             amount=amount,

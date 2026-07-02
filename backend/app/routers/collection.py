@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.utils.dependencies import get_current_active_user
+from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.services.collection_service import CollectionService
+from app.core.permissions import has_permission
+from app.models.organization import Organization, OrganizationRole
 from app.schemas.collection_rule import (
     CollectionRuleCreate,
     CollectionRuleResponse,
@@ -30,9 +32,13 @@ async def list_rules(
 async def create_rule(
     data: CollectionRuleCreate,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a collection rule."""
+    if not has_permission(role, "manage_collection_rules"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing collection rules")
     service = CollectionService(db)
     try:
         rule = await service.create_rule(current_user.id, data)
@@ -45,9 +51,13 @@ async def create_rule(
 async def deactivate_rule(
     rule_id: int,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Deactivate a collection rule."""
+    if not has_permission(role, "manage_collection_rules"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing collection rules")
     service = CollectionService(db)
     rule = await service.deactivate_rule(rule_id, current_user.id)
     if not rule:

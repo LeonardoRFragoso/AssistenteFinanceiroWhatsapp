@@ -1,5 +1,20 @@
 # PayFlow AI — Release Notes
 
+## Sprint 11: Multi-Tenant SaaS — Organizations, RBAC e Workspaces
+
+- **Organization & OrganizationMember models** (`organization.py`): tabelas `organizations` e `organization_members` com roles (owner, admin, finance, viewer)
+- **Migration** `g7b8c9d0e1f2`: cria tabelas de organização + adiciona `organization_id` em charges, customers, message_templates, collection_rules, collection_message_logs, recurring_tasks, pending_actions
+- **OrganizationService** (`organization_service.py`): CRUD de organizações, membership, invite por email, role hierarchy, permission checking
+- **RBAC** (`permissions.py`): 9 permissões mapeadas por role (view_dashboard, manage_charges, manage_customers, manage_templates, manage_collection_rules, view_analytics, export_data, manage_members, manage_settings)
+- **get_current_organization dependency**: resolve organização via header `X-Organization-ID` ou fallback para org padrão do usuário
+- **Organizations router** (`organizations.py`): endpoints CRUD + list/add/update/deactivate members
+- **RBAC enforcement**: charges (create/cancel), analytics (export), message_templates (create/update/deactivate), collection (create/deactivate rules), recurring_tasks (create/cancel)
+- **WhatsApp org context**: charges criadas via WhatsApp agora associam `organization_id` automaticamente
+- **Demo mode multi-tenant**: seed cria organização padrão para demo user e associa charges
+- **Frontend**: `OrganizationSection` component com switcher, info da org, lista de membros, adicionar/remover membros, criar nova org
+- **Testes**: 28 novos testes backend (OrganizationService, permissions, multi-tenant isolation, cascade delete) + 2 E2E tests (org section render, members list)
+- **Segurança**: isolation por organization_id, role hierarchy enforced, no sensitive financial operations
+
 ## Sprint 10: Advanced Analytics, Collection Performance e Business Insights
 
 - **ChargeAnalyticsService** (`charge_analytics_service.py`): métricas operacionais por usuário

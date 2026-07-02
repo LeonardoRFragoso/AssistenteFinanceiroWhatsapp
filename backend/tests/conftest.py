@@ -12,6 +12,8 @@ from app.models.customer import Customer
 from app.models.message_template import MessageTemplate
 from app.models.collection_rule import CollectionRule
 from app.models.collection_message_log import CollectionMessageLog
+from app.models.organization import Organization, OrganizationMember
+from app.models.recurring_task import RecurringTask, RecurringTaskLog
 
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

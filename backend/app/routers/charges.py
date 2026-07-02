@@ -15,11 +15,13 @@ from app.schemas.charge import (
 )
 from app.services.charge_service import ChargeService
 from app.services.charge_reminder_service import ChargeReminderService
-from app.utils.dependencies import get_current_active_user
+from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.utils.user_rate_limiter import charges_limiter, exports_limiter
 from app.core.audit_logger import log_charge_created, log_export
+from app.core.permissions import require_permission, has_permission
 from app.models.user import User
 from app.models.charge import ChargeStatus
+from app.models.organization import Organization, OrganizationRole
 from app.repositories.charge_repository import VALID_FILTER_STATUSES
 
 router = APIRouter(prefix="/charges", tags=["Charges"])
@@ -382,11 +384,18 @@ async def get_charge(
 async def create_charge(
     charge_data: ChargeCreate,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db)
 ):
     await charges_limiter.check(current_user.id, "create_charge")
+    if not has_permission(role, "manage_charges"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow creating charges",
+        )
     service = ChargeService(db)
-    charge = await service.create_charge(current_user.id, charge_data)
+    charge = await service.create_charge(current_user.id, charge_data, organization_id=org.id)
     log_charge_created(current_user.id, charge.id, charge.provider, str(charge.amount))
     return charge
 
@@ -395,9 +404,16 @@ async def create_charge(
 async def cancel_charge(
     charge_id: int,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db)
 ):
     await charges_limiter.check(current_user.id, "cancel_charge")
+    if not has_permission(role, "manage_charges"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow cancelling charges",
+        )
     service = ChargeService(db)
     charge = await service.cancel_charge(charge_id, current_user.id)
     if not charge:

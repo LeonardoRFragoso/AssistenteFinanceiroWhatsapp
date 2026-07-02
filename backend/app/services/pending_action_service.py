@@ -23,7 +23,8 @@ class PendingActionService:
         customer_name: str,
         description: Optional[str] = None,
         customer_phone: Optional[str] = None,
-        due_date: Optional[str] = None
+        due_date: Optional[str] = None,
+        organization_id: Optional[int] = None,
     ) -> PendingAction:
         """Create a pending action for charge creation."""
         await self.action_repo.expire_old_actions(datetime.now(timezone.utc))
@@ -33,7 +34,8 @@ class PendingActionService:
             "customer_name": customer_name,
             "description": description,
             "customer_phone": customer_phone,
-            "due_date": due_date
+            "due_date": due_date,
+            "organization_id": organization_id,
         }
 
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -73,7 +75,10 @@ class PendingActionService:
                 due_date=payload.get("due_date")
             )
 
-            charge = await self.charge_service.create_charge(user_id, charge_data)
+            charge = await self.charge_service.create_charge(
+                user_id, charge_data,
+                organization_id=payload.get("organization_id"),
+            )
             await self.action_repo.mark_executed(action_id)
             return charge
         except (InvalidOperation, ValueError) as e:
