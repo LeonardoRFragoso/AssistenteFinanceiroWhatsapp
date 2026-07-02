@@ -6,7 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7+-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-117%20backend%20%2B%2010%20E2E-success)
+![Tests](https://img.shields.io/badge/Tests-163%20backend%20%2B%2010%20E2E-success)
 ![E2E](https://img.shields.io/badge/E2E-Playwright-orange?logo=playwright&logoColor=white)
 
 SaaS financeiro conversacional para gestão de cobranças via WhatsApp com dashboard web. IA processa linguagem natural, cria cobranças, envia links de pagamento e acompanha recebimentos — com confirmação explícita do usuário em cada operação.
@@ -24,7 +24,11 @@ Autônomos e MEIs precisam de uma forma simples de cobrar clientes. Soluções e
 ## Solução
 
 - **WhatsApp → IA → Cobrança**: usuário envia mensagem natural, IA propõe cobrança, usuário confirma, sistema cria cobrança e envia link ao cliente
-- **Dashboard web**: listagem paginada com filtros, analytics, exportação CSV/PDF
+- **Consultas financeiras via WhatsApp**: listar vencidas, buscar por cliente, resumo mensal, top devedores
+- **QR Code sandbox**: cada cobrança gera QR Code fake para demonstração (não é Pix real)
+- **OCR assistivo**: envie foto de boleto/recibo, IA extrai dados e sugere lembrete
+- **Tarefas recorrentes**: lembretes automáticos diários/semanais/mensais via WhatsApp
+- **Dashboard web**: listagem paginada com filtros, analytics, QR Code modal, exportação CSV/PDF
 - **Lembretes automáticos**: scheduler periódico identifica cobranças vencidas e envia lembretes via WhatsApp
 - **Webhooks**: provider notifica pagamento, sistema atualiza status e notifica usuário
 
@@ -158,6 +162,7 @@ npm run test:e2e
 | [Security Hardening](docs/SECURITY_HARDENING.md) | Demo mode, rate limiting, webhook hardening |
 | [LinkedIn Launch Post](docs/LINKEDIN_LAUNCH_POST.md) | Post LinkedIn para lançamento |
 | [Demo Video Script](docs/DEMO_VIDEO_SCRIPT.md) | Roteiro de vídeo demo |
+| [Sprint 8 — WhatsApp Intelligence](docs/SPRINT_8_WHATSAPP_INTELLIGENCE.md) | QR Code sandbox, OCR assistivo, tarefas recorrentes |
 
 ## Limitações conscientes
 

@@ -16,7 +16,8 @@ async def test_fake_provider_create_charge():
 
     assert result["provider_charge_id"].startswith("fake_")
     assert result["payment_link"].startswith("http")
-    assert result["qr_code"].startswith("fake-pix-code")
+    assert result["qr_code"].startswith("http")
+    assert result["qr_code_base64"].startswith("data:image/png;base64,")
     assert result["status"] == "pending"
     assert result["raw_response"]["amount"] == 150.0
 

@@ -12,6 +12,7 @@ from app.services.reminder_service import ReminderService
 from app.services.report_service import ReportService
 from app.services.charge_service import ChargeService
 from app.services.pending_action_service import PendingActionService
+from app.services.financial_query_service import FinancialQueryService
 from app.repositories.user_repository import UserRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.schemas.transaction import TransactionCreate
@@ -90,7 +91,7 @@ async def whatsapp_webhook(
                 is_audio = True
                 from app.services.audio_transcription_service import AudioTranscriptionService
                 audio_service = AudioTranscriptionService()
-                
+
                 try:
                     transcription = await audio_service.process_audio_message(
                         MediaUrl0, content_type
@@ -104,10 +105,26 @@ async def whatsapp_webhook(
                         "Desculpe, nao consegui entender o audio. Pode tentar novamente ou enviar por texto?"
                     )
                     return {"status": "error", "message": "Audio transcription failed"}
+            elif "image" in content_type or "pdf" in content_type or "application/pdf" in content_type:
+                from app.services.document_analysis_service import DocumentAnalysisService
+                doc_service = DocumentAnalysisService()
+
+                try:
+                    analysis = await doc_service.analyze_media_url(MediaUrl0, content_type)
+                    response = doc_service.format_whatsapp_response(analysis)
+                    await twilio_service.send_message(From, response)
+                    return {"status": "success", "message": "Document analyzed"}
+                except Exception as e:
+                    logger.error(f"Error analyzing document: {str(e)}")
+                    await twilio_service.send_message(
+                        From,
+                        "Recebi sua imagem/documento, mas tive dificuldade na análise. Tente enviar por texto ou tente novamente."
+                    )
+                    return {"status": "error", "message": "Document analysis failed"}
             else:
                 await twilio_service.send_message(
                     From,
-                    "No momento, aceito apenas mensagens de texto e audio. Envie sua mensagem por texto ou grave um audio!"
+                    "No momento, aceito mensagens de texto, audio, imagens e PDFs. Envie sua mensagem por texto, grave um audio ou envie uma imagem/PDF!"
                 )
                 return {"status": "success", "message": "Unsupported media type"}
         
@@ -278,6 +295,30 @@ async def process_intent(
 
         elif intent == "list_paid_charges":
             return await handle_list_paid_charges(user_id, entities, db, ai_service, context)
+
+        elif intent == "list_overdue_charges":
+            return await handle_list_overdue_charges(user_id, entities, db, ai_service, context)
+
+        elif intent == "search_charges":
+            return await handle_search_charges(user_id, entities, db, ai_service, context)
+
+        elif intent == "charge_summary":
+            return await handle_charge_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "customer_charge_history":
+            return await handle_customer_charge_history(user_id, entities, db, ai_service, context)
+
+        elif intent == "monthly_financial_summary":
+            return await handle_monthly_financial_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "top_overdue_customers":
+            return await handle_top_overdue_customers(user_id, entities, db, ai_service, context)
+
+        elif intent == "create_recurring_task":
+            return await handle_create_recurring_task(user_id, entities, db, ai_service, context)
+
+        elif intent == "list_recurring_tasks":
+            return await handle_list_recurring_tasks(user_id, entities, db, ai_service, context)
 
         elif intent == "cancel_charge":
             return await handle_cancel_charge(user_id, entities, db, ai_service, context)
@@ -858,7 +899,229 @@ Exemplo: "Mostre minhas últimas transações"
 📅 Criar lembretes
 Exemplo: "Lembrar de pagar conta amanhã"
 
+🔍 Consultar cobranças
+Exemplos: "quais cobranças estão vencidas?", "quem ainda não pagou?", "me mostra as cobranças do João"
+
+📊 Resumo de cobranças
+Exemplos: "quanto tenho a receber?", "me manda um resumo das cobranças"
+
+📈 Resumo mensal
+Exemplos: "quanto entrou em junho?", "resumo financeiro de julho"
+
+🔁 Tarefas recorrentes
+Exemplos: "todo dia 5 me lembra de cobrar o João", "toda sexta me lembra de revisar cobranças"
+
 É só me enviar uma mensagem! 😊"""
+
+
+async def handle_list_overdue_charges(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        query_service = FinancialQueryService(db)
+        return await query_service.list_overdue_charges(user_id)
+    except Exception as e:
+        logger.error(f"Error listing overdue charges: {str(e)}")
+        return "Erro ao listar cobranças vencidas. Tente novamente."
+
+
+async def handle_search_charges(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        customer_name = entities.get("customer_name")
+        if not customer_name:
+            return "Qual cliente você quer buscar? Exemplo: 'me mostra as cobranças do João'"
+
+        query_service = FinancialQueryService(db)
+        return await query_service.search_charges_by_customer(user_id, customer_name)
+    except Exception as e:
+        logger.error(f"Error searching charges: {str(e)}")
+        return "Erro ao buscar cobranças. Tente novamente."
+
+
+async def handle_charge_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        query_service = FinancialQueryService(db)
+        return await query_service.charge_summary(user_id)
+    except Exception as e:
+        logger.error(f"Error generating charge summary: {str(e)}")
+        return "Erro ao gerar resumo de cobranças. Tente novamente."
+
+
+async def handle_customer_charge_history(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        customer_name = entities.get("customer_name")
+        if not customer_name:
+            return "De qual cliente você quer ver o histórico? Exemplo: 'histórico do João'"
+
+        query_service = FinancialQueryService(db)
+        return await query_service.customer_charge_history(user_id, customer_name)
+    except Exception as e:
+        logger.error(f"Error getting customer history: {str(e)}")
+        return "Erro ao buscar histórico do cliente. Tente novamente."
+
+
+async def handle_monthly_financial_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from datetime import datetime
+        now = datetime.now()
+        month = entities.get("month")
+        year = entities.get("year", now.year)
+
+        if not month:
+            return "De qual mês você quer o resumo? Exemplo: 'resumo financeiro de julho' ou 'quanto entrou em junho?'"
+
+        try:
+            month_int = int(month)
+            year_int = int(year)
+        except (ValueError, TypeError):
+            return "Não consegui identificar o mês. Tente algo como 'resumo de julho' ou 'quanto entrou em junho?'"
+
+        if not (1 <= month_int <= 12):
+            return "O mês precisa estar entre 1 e 12."
+
+        query_service = FinancialQueryService(db)
+        return await query_service.monthly_financial_summary(user_id, year_int, month_int)
+    except Exception as e:
+        logger.error(f"Error generating monthly summary: {str(e)}")
+        return "Erro ao gerar resumo mensal. Tente novamente."
+
+
+async def handle_top_overdue_customers(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        query_service = FinancialQueryService(db)
+        return await query_service.top_overdue_customers(user_id)
+    except Exception as e:
+        logger.error(f"Error listing top overdue customers: {str(e)}")
+        return "Erro ao listar clientes com mais atrasos. Tente novamente."
+
+
+async def handle_create_recurring_task(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.recurring_task_service import RecurringTaskService
+        from app.schemas.recurring_task import RecurringTaskCreate
+        from app.models.recurring_task import RecurrenceType
+
+        title = entities.get("title")
+        recurrence_type_str = entities.get("recurrence_type", "daily")
+
+        if not title:
+            return "Qual tarefa você quer criar? Exemplo: 'todo dia 5 me lembra de cobrar o João'"
+
+        try:
+            recurrence_type = RecurrenceType(recurrence_type_str)
+        except ValueError:
+            recurrence_type = RecurrenceType.DAILY
+
+        day_of_week = entities.get("day_of_week")
+        day_of_month = entities.get("day_of_month")
+
+        if isinstance(day_of_week, str):
+            day_of_week = int(day_of_week) if day_of_week else None
+        if isinstance(day_of_month, str):
+            day_of_month = int(day_of_month) if day_of_month else None
+
+        task_data = RecurringTaskCreate(
+            title=title,
+            recurrence_type=recurrence_type,
+            day_of_week=day_of_week,
+            day_of_month=day_of_month,
+        )
+
+        service = RecurringTaskService(db)
+        task = await service.create_task(user_id, task_data)
+
+        recurrence_label = {
+            "daily": "diariamente",
+            "weekly": "semanalmente",
+            "monthly": "mensalmente",
+        }.get(recurrence_type.value, recurrence_type.value)
+
+        message = f"✅ Tarefa recorrente criada!\n\n"
+        message += f"📌 {task.title}\n"
+        message += f"🔁 Recorrência: {recurrence_label}\n"
+        message += f"⏰ Próxima execução: {task.next_run_at.strftime('%d/%m/%Y às %H:%M')}\n\n"
+        message += "Esta tarefa apenas envia lembretes. Nenhuma operação bancária será executada."
+
+        return message
+    except Exception as e:
+        logger.error(f"Error creating recurring task: {str(e)}")
+        return "Erro ao criar tarefa recorrente. Tente novamente."
+
+
+async def handle_list_recurring_tasks(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.recurring_task_service import RecurringTaskService
+
+        service = RecurringTaskService(db)
+        tasks = await service.get_user_tasks(user_id)
+
+        if not tasks:
+            return "Você não tem tarefas recorrentes ativas."
+
+        active_tasks = [t for t in tasks if t.active]
+        if not active_tasks:
+            return "Você não tem tarefas recorrentes ativas."
+
+        message = f"🔁 *Suas tarefas recorrentes ({len(active_tasks)}):*\n\n"
+        for i, t in enumerate(active_tasks, 1):
+            recurrence_label = {
+                "daily": "diária",
+                "weekly": "semanal",
+                "monthly": "mensal",
+            }.get(t.recurrence_type.value, t.recurrence_type.value)
+            message += f"{i}. {t.title} ({recurrence_label})\n"
+            message += f"   Próxima: {t.next_run_at.strftime('%d/%m/%Y às %H:%M')}\n\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error listing recurring tasks: {str(e)}")
+        return "Erro ao listar tarefas recorrentes. Tente novamente."
 
 
 from datetime import timedelta

@@ -57,6 +57,7 @@ services:
       - DEMO_USER_EMAIL=demo@payflow.ai
       - DEMO_USER_PASSWORD=PayFlowDemo123
       - ENABLE_CHARGE_REMINDER_WORKER=false
+      - ENABLE_RECURRING_TASK_WORKER=false
       - FRONTEND_URL=http://localhost:3001
     depends_on:
       postgres:
