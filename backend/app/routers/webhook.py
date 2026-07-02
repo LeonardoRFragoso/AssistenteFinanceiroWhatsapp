@@ -320,6 +320,27 @@ async def process_intent(
         elif intent == "list_recurring_tasks":
             return await handle_list_recurring_tasks(user_id, entities, db, ai_service, context)
 
+        elif intent == "list_customers":
+            return await handle_list_customers(user_id, entities, db, ai_service, context)
+
+        elif intent == "customer_summary":
+            return await handle_customer_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "generate_collection_message":
+            return await handle_generate_collection_message(user_id, entities, db, ai_service, context)
+
+        elif intent == "prepare_overdue_followups":
+            return await handle_prepare_overdue_followups(user_id, entities, db, ai_service, context)
+
+        elif intent == "list_collection_rules":
+            return await handle_list_collection_rules(user_id, entities, db, ai_service, context)
+
+        elif intent == "create_collection_rule":
+            return await handle_create_collection_rule(user_id, entities, db, ai_service, context)
+
+        elif intent == "list_message_templates":
+            return await handle_list_message_templates(user_id, entities, db, ai_service, context)
+
         elif intent == "cancel_charge":
             return await handle_cancel_charge(user_id, entities, db, ai_service, context)
 
@@ -911,6 +932,15 @@ Exemplos: "quanto entrou em junho?", "resumo financeiro de julho"
 🔁 Tarefas recorrentes
 Exemplos: "todo dia 5 me lembra de cobrar o João", "toda sexta me lembra de revisar cobranças"
 
+👥 Clientes
+Exemplos: "quais clientes estão devendo?", "me mostra o histórico do João"
+
+📝 Mensagens de cobrança
+Exemplos: "gera uma mensagem educada para cobrar a Maria", "cobre os clientes vencidos"
+
+📋 Régua de cobrança
+Exemplos: "crie uma régua para lembrar 2 dias antes do vencimento", "quais templates de cobrança eu tenho?"
+
 É só me enviar uma mensagem! 😊"""
 
 
@@ -1125,3 +1155,316 @@ async def handle_list_recurring_tasks(
 
 
 from datetime import timedelta
+
+
+async def handle_list_customers(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.customer_service import CustomerService
+        service = CustomerService(db)
+        result = await service.list_customers(user_id, page=1, page_size=20)
+        items = result["items"]
+        if not items:
+            return "Você ainda não tem clientes cadastrados."
+
+        message = f"👥 *Seus clientes ({len(items)}):*\n\n"
+        for i, c in enumerate(items, 1):
+            status_label = {
+                "good_payer": "✅ Bom pagador",
+                "late_payer": "⚠️ Pagamento em atraso",
+                "frequent_late": "🔴 Atrasa frequentemente",
+                "new_customer": "🆕 Novo cliente",
+                "inactive_customer": "💤 Inativo",
+            }.get(c.get("operational_status", ""), c.get("operational_status", ""))
+            message += f"{i}. {c['name']} — {status_label}\n"
+            if c.get("has_overdue"):
+                message += f"   ⚠️ Tem cobrança vencida\n"
+            message += f"   Total pago: R$ {c.get('total_paid_amount', 0):.2f}\n\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error listing customers: {str(e)}")
+        return "Erro ao listar clientes. Tente novamente."
+
+
+async def handle_customer_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.customer_service import CustomerService
+        customer_name = entities.get("customer_name")
+        if not customer_name:
+            return "De qual cliente você quer ver o resumo? Exemplo: 'me mostra o histórico do João'"
+
+        service = CustomerService(db)
+        result = await service.list_customers(user_id, search=customer_name, page=1, page_size=1)
+        items = result["items"]
+        if not items:
+            return f"Não encontrei nenhum cliente chamado '{customer_name}'."
+
+        c = items[0]
+        status_label = {
+            "good_payer": "✅ Bom pagador",
+            "late_payer": "⚠️ Pagamento em atraso",
+            "frequent_late": "🔴 Atrasa frequentemente",
+            "new_customer": "🆕 Novo cliente",
+            "inactive_customer": "💤 Inativo",
+        }.get(c.get("operational_status", ""), c.get("operational_status", ""))
+
+        message = f"👤 *Cliente: {c['name']}*\n\n"
+        message += f"Status: {status_label}\n"
+        message += f"Total de cobranças: {c.get('total_charges_count', 0)}\n"
+        message += f"Total pago: R$ {c.get('total_paid_amount', 0):.2f}\n"
+        message += f"Total pendente: R$ {c.get('total_pending_amount', 0):.2f}\n"
+        message += f"Total vencido: R$ {c.get('total_overdue_amount', 0):.2f}\n"
+
+        if c.get("has_overdue"):
+            message += "\n⚠️ Este cliente tem cobranças vencidas. Quer gerar uma mensagem de cobrança? Diga 'gera uma mensagem para cobrar {c['name']}'."
+
+        return message
+    except Exception as e:
+        logger.error(f"Error getting customer summary: {str(e)}")
+        return "Erro ao buscar resumo do cliente. Tente novamente."
+
+
+async def handle_generate_collection_message(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.customer_service import CustomerService
+        from app.services.message_template_service import MessageTemplateService
+        from app.services.collection_service import CollectionService
+        from app.models.message_template import MessageTone
+
+        customer_name = entities.get("customer_name")
+        if not customer_name:
+            return "Para qual cliente você quer gerar a mensagem? Exemplo: 'gera uma mensagem para cobrar a Maria'"
+
+        tone_str = entities.get("tone", "neutral")
+        try:
+            tone = MessageTone(tone_str)
+        except ValueError:
+            tone = MessageTone.NEUTRAL
+
+        customer_service = CustomerService(db)
+        result = await customer_service.list_customers(user_id, search=customer_name, page=1, page_size=1)
+        items = result["items"]
+        if not items:
+            return f"Não encontrei nenhum cliente chamado '{customer_name}'."
+
+        customer = items[0]
+        charges = await customer_service.get_customer_charges(customer["id"], user_id)
+
+        overdue_charges = [
+            c for c in charges
+            if c.status.value == "pending" and c.due_date and c.due_date < datetime.now().date()
+        ]
+
+        if not overdue_charges:
+            return f"O cliente {customer['name']} não tem cobranças vencidas."
+
+        charge = overdue_charges[0]
+
+        mt_service = MessageTemplateService(db)
+        templates = await mt_service.list_templates(user_id, active_only=True)
+        template = next((t for t in templates if t.tone == tone), templates[0] if templates else None)
+
+        if template:
+            ctx = {
+                "customer_name": customer["name"],
+                "amount": f"{float(charge.amount):.2f}",
+                "description": charge.description or "cobrança",
+                "due_date": charge.due_date.strftime("%d/%m/%Y") if charge.due_date else "",
+                "payment_link": charge.payment_link or "",
+                "qr_code_note": "Sandbox/Demo — não representa Pix real",
+                "company_name": "PayFlow AI",
+            }
+            rendered = mt_service.render_template(template.template_text, ctx)
+            template_name = template.name
+        else:
+            rendered = (
+                f"Olá, {customer['name']}!\n\n"
+                f"A cobrança de R$ {float(charge.amount):.2f} referente a "
+                f"{charge.description or 'cobrança'} está em atraso.\n\n"
+                f"Link: {charge.payment_link or 'N/A'}\n\n"
+                f"Por favor, regularize o pagamento."
+            )
+            template_name = "Fallback (sem template)"
+
+        collection_service = CollectionService(db)
+        await collection_service.log_message(
+            user_id=user_id,
+            charge_id=charge.id,
+            customer_id=customer["id"],
+            template_id=template.id if template else None,
+            message_preview=rendered,
+            status="draft",
+        )
+
+        message = f"📝 *Rascunho de mensagem para {customer['name']}:*\n\n"
+        message += f"Template: {template_name}\n\n"
+        message += f"---\n{rendered}\n---\n\n"
+        message += "⚠️ Esta é apenas uma sugestão. Nenhuma mensagem foi enviada.\n"
+        message += "Para enviar, confirme explicitamente respondendo \"enviar\"."
+
+        return message
+    except Exception as e:
+        logger.error(f"Error generating collection message: {str(e)}")
+        return "Erro ao gerar mensagem de cobrança. Tente novamente."
+
+
+async def handle_prepare_overdue_followups(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.collection_service import CollectionService
+        service = CollectionService(db)
+        result = await service.generate_followup_previews(user_id, limit=10)
+        items = result["items"]
+
+        if not items:
+            return "✅ Nenhuma cobrança vencida encontrada. Tudo em dia!"
+
+        message = f"📋 *Encontrei {len(items)} cobrança(s) vencida(s).*\n\n"
+        for i, item in enumerate(items, 1):
+            message += f"{i}. {item['customer_name']} — R$ {item['amount']:.2f} — venceu há {item['days_overdue']} dia(s)\n"
+
+        message += f"\n{result['message']}\n\n"
+        message += "⚠️ Nenhuma mensagem será enviada automaticamente. "
+        message += "Para ver os rascunhos, acesse o dashboard ou peça 'gera uma mensagem para cobrar [nome]'."
+
+        return message
+    except Exception as e:
+        logger.error(f"Error preparing overdue followups: {str(e)}")
+        return "Erro ao preparar follow-ups. Tente novamente."
+
+
+async def handle_list_collection_rules(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.collection_service import CollectionService
+        service = CollectionService(db)
+        rules = await service.list_rules(user_id)
+
+        if not rules:
+            return "Você não tem regras de cobrança configuradas. Exemplo: 'crie uma régua para lembrar 2 dias antes do vencimento'"
+
+        message = f"📋 *Suas regras de cobrança ({len(rules)}):*\n\n"
+        for i, r in enumerate(rules, 1):
+            trigger_label = {
+                "before_due": f"{r.days_offset} dia(s) antes do vencimento",
+                "on_due": "no dia do vencimento",
+                "after_due": f"{r.days_offset} dia(s) após o vencimento",
+            }.get(r.trigger_type.value, r.trigger_type.value)
+            message += f"{i}. {r.name} — {trigger_label}\n"
+
+        message += "\n⚠️ As regras não enviam mensagens automaticamente. Elas apenas preparam rascunhos para confirmação."
+        return message
+    except Exception as e:
+        logger.error(f"Error listing collection rules: {str(e)}")
+        return "Erro ao listar regras de cobrança. Tente novamente."
+
+
+async def handle_create_collection_rule(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.collection_service import CollectionService
+        from app.schemas.collection_rule import CollectionRuleCreate
+        from app.models.collection_rule import TriggerType
+
+        name = entities.get("name")
+        days_offset = entities.get("days_offset", 0)
+        trigger_type_str = entities.get("trigger_type", "on_due")
+
+        if not name:
+            name = "Regra de cobrança"
+
+        try:
+            trigger_type = TriggerType(trigger_type_str)
+        except ValueError:
+            trigger_type = TriggerType.ON_DUE
+
+        if isinstance(days_offset, str):
+            days_offset = int(days_offset) if days_offset else 0
+
+        data = CollectionRuleCreate(
+            name=name,
+            days_offset=days_offset,
+            trigger_type=trigger_type,
+        )
+
+        service = CollectionService(db)
+        rule = await service.create_rule(user_id, data)
+
+        trigger_label = {
+            "before_due": f"{rule.days_offset} dia(s) antes do vencimento",
+            "on_due": "no dia do vencimento",
+            "after_due": f"{rule.days_offset} dia(s) após o vencimento",
+        }.get(rule.trigger_type.value, rule.trigger_type.value)
+
+        message = f"✅ Regra de cobrança criada!\n\n"
+        message += f"📌 {rule.name}\n"
+        message += f"⏰ Gatilho: {trigger_label}\n\n"
+        message += "⚠️ Esta regra não envia mensagens automaticamente. Ela apenas prepara rascunhos para confirmação explícita."
+
+        return message
+    except Exception as e:
+        logger.error(f"Error creating collection rule: {str(e)}")
+        return "Erro ao criar regra de cobrança. Tente novamente."
+
+
+async def handle_list_message_templates(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.message_template_service import MessageTemplateService
+        service = MessageTemplateService(db)
+        templates = await service.list_templates(user_id, active_only=True)
+
+        if not templates:
+            return "Você não tem templates de mensagem. Acesse o dashboard para criar templates padrão."
+
+        message = f"📝 *Seus templates de mensagem ({len(templates)}):*\n\n"
+        for i, t in enumerate(templates, 1):
+            tone_label = {
+                "friendly": "amigável",
+                "neutral": "neutro",
+                "firm": "firme",
+            }.get(t.tone.value, t.tone.value)
+            message += f"{i}. {t.name} (tom: {tone_label})\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error listing message templates: {str(e)}")
+        return "Erro ao listar templates. Tente novamente."

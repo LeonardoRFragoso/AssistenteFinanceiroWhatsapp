@@ -8,6 +8,10 @@ from app.models.reminder import Reminder
 from app.models.subscription import Subscription
 from app.models.plan import Plan
 from app.models.conversation_log import ConversationLog
+from app.models.customer import Customer
+from app.models.message_template import MessageTemplate
+from app.models.collection_rule import CollectionRule
+from app.models.collection_message_log import CollectionMessageLog
 
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

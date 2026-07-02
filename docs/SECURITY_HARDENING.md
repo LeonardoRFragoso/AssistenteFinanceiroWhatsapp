@@ -100,6 +100,8 @@ Global IP-based rate limiting middleware: 100 requests/minute per IP.
 - [ ] `SECRET_KEY` is a strong random value (64+ chars)
 - [ ] No secrets in `.env` committed to git
 - [ ] Redis available for rate limiting (or accept in-memory fallback)
+- [ ] Collection rules are non-transactional (no auto-sending)
+- [ ] Message templates validated against aggressive language
 
 ## OCR Assistive Security (Sprint 8/8.1)
 
@@ -111,3 +113,15 @@ Global IP-based rate limiting middleware: 100 requests/minute per IP.
 - **Dados sensíveis não são logados**: logs contêm apenas metadados (tipo, tamanho, confiança), nunca conteúdo do documento
 - **Limite de arquivo**: 5MB máximo, tipos aceitos: PNG, JPG, WebP, PDF
 - **Arquivo não é salvo permanentemente**: processado em memória e descartado
+
+## Collection & Customer Intelligence Security (Sprint 9)
+
+- **Nenhuma mensagem de cobrança é enviada automaticamente**: todas as mensagens são rascunhos (DRAFT) até confirmação explícita
+- **IA pode sugerir, usuário confirma**: o sistema gera sugestões de mensagem, mas o envio requer confirmação do usuário
+- **Linguagem agressiva bloqueada**: templates com palavras abusivas (caloteiro, ladrão, etc.) são rejeitados na criação
+- **Placeholders validados**: apenas placeholders permitidos são aceitos em templates; unknown placeholders são rejeitados
+- **Score operacional não é score de crédito**: o status do cliente é um indicador de relacionamento, não deve ser usado para decisões de crédito
+- **Isolamento por usuário**: clientes, templates e regras são isolados por user_id
+- **Logs de mensagens**: todas as mensagens geradas são logadas com status (draft, pending_confirmation, sent, skipped, failed)
+- **Regras de cobrança são não-transacionais**: apenas preparam rascunhos, nunca executam operações bancárias
+- **QR Codes no PDF são sandbox**: não representam Pix QR codes reais, claramente identificados como demo

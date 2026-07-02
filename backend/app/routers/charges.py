@@ -253,6 +253,40 @@ async def export_charges_pdf(
     ]))
     elements.append(charge_table)
 
+    # QR Code sandbox section for pending charges
+    pending_charges = [c for c in charges if service.get_derived_status(c) in ("pending", "overdue")]
+    if pending_charges:
+        elements.append(Spacer(1, 1*cm))
+        elements.append(Paragraph("<b>QR Codes (Sandbox/Demo)</b>", normal_style))
+        elements.append(Spacer(1, 0.2*cm))
+        elements.append(Paragraph(
+            "<i>Aviso: Estes QR codes são exclusivamente para demonstração. "
+            "Não representam Pix QR codes reais e não processam pagamentos.</i>",
+            normal_style
+        ))
+        elements.append(Spacer(1, 0.3*cm))
+
+        qr_table_data = [["Cliente", "Valor", "QR Code (Sandbox)", "Link de Pagamento"]]
+        for c in pending_charges[:15]:
+            qr_text = c.qr_code or "N/A"
+            qr_table_data.append([
+                c.customer_name[:25],
+                f"R$ {float(c.amount):.2f}",
+                qr_text[:40] + ("..." if len(qr_text) > 40 else ""),
+                (c.payment_link or "-")[:50],
+            ])
+
+        qr_table = Table(qr_table_data, colWidths=[3*cm, 2*cm, 4*cm, 5*cm])
+        qr_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fef3c7')]),
+        ]))
+        elements.append(qr_table)
+
     doc.build(elements)
     buffer.seek(0)
     filename = f"charges_report_{date.today().isoformat()}.pdf"

@@ -130,6 +130,44 @@ export const documentsAPI = {
   },
 };
 
+export const customersAPI = {
+  list: (params?: { search?: string; status_filter?: string; has_overdue?: boolean; sort_by?: string; sort_order?: string; page?: number; page_size?: number }) => {
+    let url = '/customers';
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.status_filter) searchParams.append('status_filter', params.status_filter);
+    if (params?.has_overdue !== undefined) searchParams.append('has_overdue', String(params.has_overdue));
+    if (params?.sort_by) searchParams.append('sort_by', params.sort_by);
+    if (params?.sort_order) searchParams.append('sort_order', params.sort_order);
+    if (params?.page) searchParams.append('page', String(params.page));
+    if (params?.page_size) searchParams.append('page_size', String(params.page_size));
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
+    return api.get(url);
+  },
+  getById: (id: number) => api.get(`/customers/${id}`),
+  getCharges: (id: number) => api.get(`/customers/${id}/charges`),
+  getSummary: (id: number) => api.get(`/customers/${id}/summary`),
+  updateNotes: (id: number, notes: string) => api.patch(`/customers/${id}/notes`, { notes }),
+};
+
+export const messageTemplatesAPI = {
+  list: (activeOnly?: boolean) => api.get(`/message-templates${activeOnly ? '?active_only=true' : ''}`),
+  create: (data: { name: string; tone: string; template_text: string }) => api.post('/message-templates', data),
+  update: (id: number, data: { name?: string; tone?: string; template_text?: string }) => api.put(`/message-templates/${id}`, data),
+  preview: (id: number, data: { customer_name?: string; amount?: string; description?: string; due_date?: string; payment_link?: string }) =>
+    api.post(`/message-templates/${id}/preview`, data),
+  deactivate: (id: number) => api.post(`/message-templates/${id}/deactivate`),
+};
+
+export const collectionAPI = {
+  listRules: () => api.get('/collection/rules'),
+  createRule: (data: { name: string; days_offset: number; trigger_type: string; template_id?: number }) => api.post('/collection/rules', data),
+  deactivateRule: (id: number) => api.post(`/collection/rules/${id}/deactivate`),
+  getOverdueFollowups: (limit?: number) => api.get(`/collection/followups/overdue${limit ? `?limit=${limit}` : ''}`),
+  listLogs: (limit?: number) => api.get(`/collection/logs${limit ? `?limit=${limit}` : ''}`),
+};
+
 export const adminAPI = {
   getMetrics: () => api.get('/admin/metrics'),
   getFunnel: () => api.get('/admin/funnel'),

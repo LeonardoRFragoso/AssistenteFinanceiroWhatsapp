@@ -63,6 +63,18 @@ class ChargeService:
         )
 
         logger.info(f"Charge {charge.id} created for user {user_id} via {provider_name}")
+
+        try:
+            from app.services.customer_service import CustomerService
+            customer_service = CustomerService(self.db)
+            await customer_service.get_or_create_customer(
+                user_id=user_id,
+                name=data.customer_name,
+                phone=data.customer_phone,
+            )
+        except Exception as ce:
+            logger.warning(f"Failed to auto-create customer for charge {charge.id}: {ce}")
+
         return charge
 
     async def get_user_charges(self, user_id: int, limit: int = 50, status: Optional[str] = None) -> List[Charge]:

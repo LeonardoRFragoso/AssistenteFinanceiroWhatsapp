@@ -44,6 +44,13 @@ INTENTS POSSÍVEIS:
 - top_overdue_customers: Usuário quer saber quais clientes mais atrasam (ex: "quais clientes mais atrasaram pagamento?", "quem mais me deve?")
 - create_recurring_task: Usuário quer criar uma tarefa/lembrete recorrente (ex: "todo dia 5 me lembra de cobrar o João", "toda sexta me lembra de revisar cobranças")
 - list_recurring_tasks: Usuário quer listar tarefas recorrentes (ex: "quais lembretes recorrentes tenho?", "minhas tarefas automáticas")
+- list_customers: Usuário quer listar clientes (ex: "quais clientes estão devendo?", "meus clientes", "lista de clientes")
+- customer_summary: Usuário quer resumo de um cliente (ex: "me mostra o histórico do João", "resumo do cliente Maria")
+- generate_collection_message: Usuário quer gerar mensagem de cobrança (ex: "gera uma mensagem educada para cobrar a Maria", "cria uma mensagem de cobrança")
+- prepare_overdue_followups: Usuário quer preparar cobranças vencidas (ex: "cobre os clientes vencidos", "prepara cobrança para todos vencidos")
+- list_collection_rules: Usuário quer listar regras de cobrança (ex: "quais regras de cobrança eu tenho?", "minha régua de cobrança")
+- create_collection_rule: Usuário quer criar regra de cobrança (ex: "crie uma régua para lembrar 2 dias antes do vencimento", "criar regra de cobrança")
+- list_message_templates: Usuário quer listar templates de mensagem (ex: "quais templates de cobrança eu tenho?", "meus templates")
 - help: Usuário precisa de ajuda ou não entendeu
 
 EXTRAÇÃO DE ENTIDADES:
@@ -95,6 +102,15 @@ Para create_recurring_task, extraia:
 - recurrence_type: "daily", "weekly", ou "monthly"
 - day_of_week (0-6, onde 0=domingo, apenas para weekly)
 - day_of_month (1-31, apenas para monthly)
+
+Para generate_collection_message, extraia:
+- customer_name (nome do cliente, se mencionado)
+- tone: "friendly", "neutral", ou "firm" (se mencionado, senão use "neutral")
+
+Para create_collection_rule, extraia:
+- name (nome da regra)
+- days_offset (número de dias)
+- trigger_type: "before_due", "on_due", ou "after_due"
 
 IMPORTANTE:
 - Entenda português informal e gírias
