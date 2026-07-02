@@ -13,6 +13,10 @@ from app.models.provider_event import ProviderEvent
 from app.models.charge_reminder_log import ChargeReminderLog, ReminderType
 from app.models.charge_delivery_log import ChargeDeliveryLog, DeliveryStatus, DeliveryChannel
 from app.models.recurring_task import RecurringTask, RecurringTaskLog, RecurrenceType
+from app.models.customer import Customer, CustomerStatus
+from app.models.message_template import MessageTemplate, MessageTone
+from app.models.collection_rule import CollectionRule, TriggerType
+from app.models.collection_message_log import CollectionMessageLog, CollectionMessageStatus
 
 __all__ = [
     "User",
@@ -37,4 +41,12 @@ __all__ = [
     "RecurringTask",
     "RecurringTaskLog",
     "RecurrenceType",
+    "Customer",
+    "CustomerStatus",
+    "MessageTemplate",
+    "MessageTone",
+    "CollectionRule",
+    "TriggerType",
+    "CollectionMessageLog",
+    "CollectionMessageStatus",
 ]

@@ -124,3 +124,17 @@
 - **30 novos testes de estabilização** — AIService init (4), Twilio init (3), OCR mock (7), QR Code sandbox (5), Recurring task isolation (5), WhatsApp media handling (6)
 - **Resultado final: 174 passed, 0 failed, 0 errors**
 - **Documentação** — contagens corrigidas em README, RELEASE_NOTES, SPRINT_8
+
+## Sprint 9: Customer Intelligence, Régua de Cobrança e Templates de Mensagens
+
+- **Customer Intelligence** — Novo modelo `Customer` com auto-criação ao gerar cobranças, score operacional dinâmico (good_payer, late_payer, frequent_late, new_customer, inactive_customer), histórico por cliente, busca e filtros
+- **Message Templates** — Modelo `MessageTemplate` com tons (amigável, neutro, firme), placeholders seguros validados, bloqueio de linguagem agressiva/abusiva, templates padrão via seed, preview renderizado
+- **Collection Rules** — Modelo `CollectionRule` com gatilhos (before_due, on_due, after_due), regras não enviam mensagens automaticamente, apenas preparam rascunhos
+- **Collection Message Logs** — Modelo `CollectionMessageLog` rastreia todas as mensagens geradas com status (draft, pending_confirmation, sent, skipped, failed)
+- **WhatsApp: 7 novas intents** — list_customers, customer_summary, generate_collection_message, prepare_overdue_followups, list_collection_rules, create_collection_rule, list_message_templates
+- **Confirmação explícita** — Todas as mensagens de cobrança são rascunhos. Nenhuma é enviada sem confirmação explícita do usuário
+- **Dashboard** — Nova seção "Customer Intelligence & Régua de Cobrança" com 3 abas: Clientes, Templates, Régua de Cobrança
+- **PDF Export** — Seção de QR Codes (Sandbox/Demo) adicionada ao PDF de cobranças
+- **60 novos testes** — CustomerService (16), MessageTemplateService (13), CollectionService (13), WhatsApp intents (11), Explicit confirmation (2), No banking operations (2), Outros (3)
+- **Resultado final: 234 passed, 0 failed, 0 errors**
+- **Documentação** — `SPRINT_9_CUSTOMER_INTELLIGENCE.md`
