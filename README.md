@@ -1,44 +1,49 @@
-# 💰 PayFlow AI - Assistente Financeiro Transacional via WhatsApp
+# 💰 PayFlow AI — Assistente Financeiro Conversacional via WhatsApp
 
-Sistema SaaS de gestão financeira e cobranças via WhatsApp com dashboard web. Utiliza inteligência artificial para processamento de linguagem natural, permitindo registrar despesas, receitas e criar cobranças com links de pagamento de forma segura.
+![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7+-DC382D?logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-117%20backend%20%2B%2010%20E2E-success)
+![E2E](https://img.shields.io/badge/E2E-Playwright-orange?logo=playwright&logoColor=white)
 
-## Para avaliadores técnicos
+SaaS financeiro conversacional para gestão de cobranças via WhatsApp com dashboard web. IA processa linguagem natural, cria cobranças, envia links de pagamento e acompanha recebimentos — com confirmação explícita do usuário em cada operação.
 
-### Problema resolvido
+---
 
-Autônomos, MEIs e pequenos negócios precisam de uma forma simples de cobrar clientes e acompanhar pagamentos. O PayFlow AI resolve isso permitindo criar cobranças, enviar links de pagamento e acompanhar recebimentos via WhatsApp — sem precisar de um app financeiro complexo.
+## O que é
 
-### Principais fluxos
+PayFlow AI é um assistente de cobranças que opera via WhatsApp, permitindo que autônomos, MEIs e pequenos negócios criem cobranças, enviem links de pagamento e acompanhem recebimentos sem precisar de um app financeiro complexo.
 
-- **WhatsApp → IA → Cobrança**: Usuário envia mensagem natural, IA propõe cobrança, usuário confirma, sistema cria cobrança e envia link ao cliente
-- **Webhook → Pagamento**: Provider notifica pagamento, sistema atualiza status e notifica usuário via WhatsApp
-- **Lembretes**: Scheduler periódico identifica cobranças vencidas/próximas do vencimento e envia lembretes
-- **Dashboard**: Listagem paginada com filtros (status derivado, date range inclusivo), analytics, exportação CSV/PDF
+## Problema
 
-### Arquitetura
+Autônomos e MEIs precisam de uma forma simples de cobrar clientes. Soluções existentes são complexas, exigem apps dedicados e não aproveitam o canal onde o pequeno negócio já está: o WhatsApp.
 
-- **Backend**: FastAPI async, SQLAlchemy 2.0, camadas (routers → services → repositories)
-- **Frontend**: Next.js + TypeScript + TailwindCSS
-- **Queue**: Redis + RQ para workers assíncronos
-- **IA**: OpenAI GPT-4o para NLP
-- **Mensageria**: Twilio WhatsApp Business API
-- Ver `docs/ARCHITECTURE.md` para detalhes completos
+## Solução
 
-### Decisões de segurança
+- **WhatsApp → IA → Cobrança**: usuário envia mensagem natural, IA propõe cobrança, usuário confirma, sistema cria cobrança e envia link ao cliente
+- **Dashboard web**: listagem paginada com filtros, analytics, exportação CSV/PDF
+- **Lembretes automáticos**: scheduler periódico identifica cobranças vencidas e envia lembretes via WhatsApp
+- **Webhooks**: provider notifica pagamento, sistema atualiza status e notifica usuário
 
-- Provider padrão é `fake` — nenhuma cobrança real é processada
-- Mercado Pago sandbox apenas com opt-in explícito
-- Confirmação explícita para todas as cobranças via WhatsApp
-- JWT auth, rate limiting, security headers
-- **Sem Pix Out, sem saque, sem conta digital, sem BaaS, sem Open Finance**
-- Segredos via `.env`, nunca commitados
-- Demo mode desativado por padrão
-- **Demo mode nunca roda em produção** — app falha na inicialização se `ENVIRONMENT=production` e `ENABLE_DEMO_MODE=true`
-- **Demo mode exige provider fake** — app falha na inicialização se `ENABLE_DEMO_MODE=true` e `PAYFLOW_PAYMENT_PROVIDER != fake`
-- **Mercado Pago bloqueado em demo mode** — provider factory rejeita `mercado_pago` quando demo ativo
-- Credenciais demo são apenas para ambiente local/dev
+## Stack
 
-### Como rodar demo
+| Camada | Tecnologia |
+|---|---|
+| Backend | Python 3.11+, FastAPI (async), SQLAlchemy 2.0, Pydantic |
+| Frontend | Next.js 16, TypeScript, TailwindCSS, Lucide React |
+| Database | PostgreSQL 17, Alembic (migrations) |
+| Cache/Queue | Redis 7+, RQ (workers assíncronos) |
+| IA | OpenAI GPT-4o (NLP, classificação de intenção) |
+| Mensageria | Twilio WhatsApp Business API |
+| Pagamentos | Provider fake (padrão) / Mercado Pago sandbox (opt-in) |
+| PDF | ReportLab |
+| Infra | Docker Compose |
+| Testes | pytest (117 testes), Playwright E2E (10 cenários) |
+
+## Como rodar demo
 
 ```bash
 # Docker Compose demo (recomendado)
@@ -50,7 +55,7 @@ docker-compose -f docker-compose.demo.yml up --build
 # Login:    Clique em "Entrar como Demo"
 ```
 
-### Como rodar testes
+## Como rodar testes
 
 ```bash
 # Backend
@@ -74,19 +79,86 @@ cd frontend
 npm run test:e2e
 ```
 
-### Limitações conscientes
+## Arquitetura
 
-- Não é uma instituição financeira
-- Não oferece conta digital, Pix Out, saque ou pagamento de boletos
-- Provider fake é o padrão (sandbox)
-- Twilio WhatsApp Sandbox requer código de join
-- OpenAI API key necessária para IA
+```
+┌─────────────┐     ┌──────────────┐     ┌───────────────┐
+│  WhatsApp   │────→│   Twilio     │────→│   FastAPI     │
+│  (Cliente)  │     │   Webhook    │     │   Backend     │
+└─────────────┘     └──────────────┘     └───────┬───────┘
+                                                 │
+                    ┌──────────────┐     ┌───────┴───────┐
+                    │   OpenAI     │←───→│   AI Service  │
+                    │   GPT-4o     │     └───────┬───────┘
+                    └──────────────┘             │
+                    ┌──────────────┐     ┌───────┴───────┐
+                    │  PostgreSQL  │←───→│  SQLAlchemy   │
+                    │              │     │  (async)      │
+                    └──────────────┘     └───────┬───────┘
+                                                 │
+                    ┌──────────────┐     ┌───────┴───────┐
+                    │    Redis     │←───→│  RQ Workers   │
+                    │  (cache/rl)  │     │  (reminders)  │
+                    └──────────────┘     └───────────────┘
+                                                 │
+                    ┌──────────────┐     ┌───────┴───────┐
+                    │  Next.js     │←───→│   Frontend    │
+                    │  TypeScript  │     │   Dashboard   │
+                    └──────────────┘     └───────────────┘
+```
 
-### Próximos passos
+**Camadas do backend**: Routers → Services → Repositories → Models
 
-- Multi-tenant
-- Integração com mais provedores de pagamento
-- Dashboard de admin avançado
+- **Providers**: camada desacoplada de provedores de pagamento (fake, mercado_pago) com factory pattern
+- **Integrations**: Twilio, OpenAI, Mercado Pago SDK
+- Ver `docs/ARCHITECTURE.md` e `docs/CASE_STUDY.md` para detalhes
+
+## Segurança
+
+- **Provider padrão é `fake`** — nenhuma cobrança real é processada sem opt-in explícito
+- **Mercado Pago sandbox** apenas com credenciais explícitas
+- **Confirmação explícita** do usuário antes de qualquer cobrança
+- **JWT auth**, rate limiting (Redis + fallback), security headers
+- **Demo mode nunca roda em produção** — app falha na inicialização se `ENVIRONMENT=production` e `ENABLE_DEMO_MODE=true`
+- **Demo mode exige provider fake** — app falha se `ENABLE_DEMO_MODE=true` e provider != fake
+- **Mercado Pago bloqueado em demo mode** — factory rejeita
+- **Webhook hardening** — validação de assinatura Twilio (obrigatória em prod), Mercado Pago `x-signature` + idempotência
+- **Audit logging** estruturado com sanitização de dados sensíveis
+- **Sentry opcional** com `before_send` hook para redaction
+- **Sem Pix Out, sem saque, sem conta digital, sem BaaS, sem Open Finance**
+- Segredos via `.env`, nunca commitados
+
+## Screenshots
+
+![Landing](docs/assets/landing.png)
+![Login Demo](docs/assets/login-demo.png)
+![Dashboard](docs/assets/dashboard-overview.png)
+![Charges Table](docs/assets/charges-table.png)
+![Analytics](docs/assets/analytics.png)
+![Export](docs/assets/export-pdf.png)
+
+> Screenshots gerados via `npx playwright test e2e/screenshots.spec.ts` contra a demo stack.
+
+## Limitações conscientes
+
+- **Não é uma instituição financeira** — não oferece conta digital, Pix Out, saque ou pagamento de boletos
+- **Provider fake é o padrão** — sandbox segura, sem cobranças reais
+- **Mercado Pago é opt-in** — requer credenciais sandbox explícitas
+- **Twilio WhatsApp Sandbox** — requer código de join para testes
+- **OpenAI API key** — necessária para funcionalidade de IA
+- **Demo mode** — desativado por padrão, nunca em produção
+
+## Roadmap
+
+- [x] Sprint 1-2: Transações, cobranças, dashboard, lembretes
+- [x] Sprint 3-4: Mercado Pago sandbox, analytics, PDF, testes de integração
+- [x] Sprint 5-5.1: Demo mode, landing page, hardening de segurança
+- [x] Sprint 6-6.1: E2E, observabilidade, rate limiting, webhook hardening, CI stabilization
+- [x] Sprint 7: Portfolio polish, case study, screenshots, release candidate
+- [ ] Multi-tenant (organizações com múltiplos usuários)
+- [ ] Integração com mais provedores de pagamento
+- [ ] Dashboard de admin avançado com gráficos temporais
+- [ ] App mobile (React Native)
 
 ## � Como Testar o WhatsApp
 
