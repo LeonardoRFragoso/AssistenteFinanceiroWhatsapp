@@ -3,8 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.core.database import get_db
 from app.core.config import settings
-from app.utils.dependencies import get_current_active_user
+from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.services.recurring_task_service import RecurringTaskService
+from app.core.permissions import has_permission
+from app.models.organization import Organization, OrganizationRole
 from app.schemas.recurring_task import (
     RecurringTaskCreate,
     RecurringTaskResponse,
@@ -20,12 +22,16 @@ router = APIRouter(prefix="/recurring-tasks", tags=["Recurring Tasks"])
 async def create_recurring_task(
     task_data: RecurringTaskCreate,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a recurring non-transactional task.
 
     The task only sends reminders/messages. It NEVER executes payments.
     """
+    if not has_permission(role, "manage_charges"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing recurring tasks")
     service = RecurringTaskService(db)
     task = await service.create_task(current_user.id, task_data)
     return task
@@ -46,9 +52,13 @@ async def list_recurring_tasks(
 async def cancel_recurring_task(
     task_id: int,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel (deactivate) a recurring task."""
+    if not has_permission(role, "manage_charges"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing recurring tasks")
     service = RecurringTaskService(db)
     task = await service.cancel_task(task_id, current_user.id)
     if not task:

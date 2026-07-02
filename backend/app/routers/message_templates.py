@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.utils.dependencies import get_current_active_user
+from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.services.message_template_service import MessageTemplateService
+from app.core.permissions import has_permission
+from app.models.organization import Organization, OrganizationRole
 from app.schemas.message_template import (
     MessageTemplateCreate,
     MessageTemplateUpdate,
@@ -32,9 +34,13 @@ async def list_templates(
 async def create_template(
     data: MessageTemplateCreate,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new message template."""
+    if not has_permission(role, "manage_templates"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing templates")
     service = MessageTemplateService(db)
     try:
         template = await service.create_template(current_user.id, data)
@@ -48,9 +54,13 @@ async def update_template(
     template_id: int,
     data: MessageTemplateUpdate,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a message template."""
+    if not has_permission(role, "manage_templates"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing templates")
     service = MessageTemplateService(db)
     try:
         template = await service.update_template(template_id, current_user.id, data)
@@ -85,9 +95,13 @@ async def preview_template(
 async def deactivate_template(
     template_id: int,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Deactivate a message template."""
+    if not has_permission(role, "manage_templates"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing templates")
     service = MessageTemplateService(db)
     template = await service.deactivate_template(template_id, current_user.id)
     if not template:

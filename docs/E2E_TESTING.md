@@ -88,7 +88,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
 
 ## Test Scenarios
 
-`frontend/e2e/demo.spec.ts` covers 20 scenarios:
+`frontend/e2e/demo.spec.ts` covers 22 scenarios:
 
 1. **Landing page loads** — Verifies h1 is visible
 2. **Demo login button visible** — Checks "Entrar na Demo" button on landing
@@ -110,6 +110,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
 18. **QR Code sandbox modal and exports work** — Opens QR modal, verifies sandbox warning, closes, exports CSV and PDF (Sprint 9)
 19. **Advanced Analytics section renders** — Verifies analytics section, cards, period filter, and export buttons (Sprint 10)
 20. **Analytics period filter changes data** — Changes period select, verifies section reloads (Sprint 10)
+21. **Organization section renders** — Verifies org section, switcher, org info, and members section (Sprint 11)
+22. **Organization members list displays** — Verifies members table has at least one row (Sprint 11)
 
 Sprint 9 tests (11-18) use **serial mode** with a shared login session to reduce backend load.
 
@@ -136,6 +138,16 @@ The following `data-testid` attributes are used for stable E2E selectors:
 | `analytics-customer-performance` | Customer ranking table | Customer performance table |
 | `analytics-collection-performance` | Collection performance cards | Collection metrics cards |
 | `analytics-insights` | Insights section | Textual insights display |
+| `organization-section` | OrganizationSection container | Organization & members section |
+| `organization-switcher` | Organization select dropdown | Switch between organizations |
+| `organization-info` | Organization info panel | Display org details |
+| `organization-members` | Members section container | Members list and management |
+| `add-member-button` | Add member button | Open add member form |
+| `new-member-email` | New member email input | Email field for new member |
+| `new-member-role` | New member role select | Role selector for new member |
+| `confirm-add-member` | Confirm add member button | Submit new member form |
+| `new-org-name` | New org name input | Name field for new organization |
+| `confirm-create-org` | Confirm create org button | Submit new organization form |
 
 ### Test strategy
 

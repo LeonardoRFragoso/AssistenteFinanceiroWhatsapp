@@ -18,6 +18,7 @@ class Customer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     phone = Column(String(20), nullable=True, index=True)
     email = Column(String(255), nullable=True)

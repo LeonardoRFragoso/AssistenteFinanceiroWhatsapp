@@ -10,6 +10,7 @@ from app.models.charge import Charge, ChargeStatus
 from app.models.transaction import Transaction
 from app.models.subscription import Subscription
 from app.models.plan import Plan
+from app.services.organization_service import OrganizationService
 from app.core.logging import logger
 
 
@@ -50,13 +51,14 @@ class DemoService:
         logger.info(f"Demo user created: {user.email}")
         return user
 
-    async def seed_demo_charges(self, user_id: int) -> int:
+    async def seed_demo_charges(self, user_id: int, organization_id: int = None) -> int:
         """Create varied demo charges. Returns count created."""
         today = date.today()
 
         demo_charges = [
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="João Silva",
                 customer_phone="+5511999999999",
                 amount=Decimal("150.00"),
@@ -259,13 +261,18 @@ class DemoService:
             await self.db.commit()
             logger.info(f"Demo data cleared for user {user.id}")
 
-        charges_count = await self.seed_demo_charges(user.id)
+        # Ensure demo user has a default organization
+        org_service = OrganizationService(self.db)
+        org = await org_service.ensure_default_organization(user)
+
+        charges_count = await self.seed_demo_charges(user.id, organization_id=org.id)
         transactions_count = await self.seed_demo_transactions(user.id)
 
         return {
             "status": "ok",
             "message": "Demo data reset successfully",
             "user_email": user.email,
+            "organization_id": org.id,
             "charges_created": charges_count,
             "transactions_created": transactions_count,
         }
@@ -273,6 +280,10 @@ class DemoService:
     async def seed_all(self) -> Dict[str, Any]:
         """Create demo user and seed data if not exists. Idempotent."""
         user = await self.get_or_create_demo_user()
+
+        # Ensure demo user has a default organization
+        org_service = OrganizationService(self.db)
+        org = await org_service.ensure_default_organization(user)
 
         existing_charges = await self.db.execute(
             select(Charge).where(Charge.user_id == user.id)
@@ -289,17 +300,19 @@ class DemoService:
                 "status": "ok",
                 "message": "Demo data already exists",
                 "user_email": user.email,
+                "organization_id": org.id,
                 "charges_count": len(charges),
                 "transactions_count": len(transactions),
             }
 
-        charges_count = await self.seed_demo_charges(user.id)
+        charges_count = await self.seed_demo_charges(user.id, organization_id=org.id)
         transactions_count = await self.seed_demo_transactions(user.id)
 
         return {
             "status": "ok",
             "message": "Demo data seeded successfully",
             "user_email": user.email,
+            "organization_id": org.id,
             "charges_created": charges_count,
             "transactions_created": transactions_count,
         }

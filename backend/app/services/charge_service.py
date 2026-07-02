@@ -21,7 +21,7 @@ class ChargeService:
         self.user_repo = UserRepository(db)
         self.provider = get_payment_provider()
 
-    async def create_charge(self, user_id: int, data: ChargeCreate) -> Charge:
+    async def create_charge(self, user_id: int, data: ChargeCreate, organization_id: Optional[int] = None) -> Charge:
         """Create a charge with the configured provider and persist it."""
         provider_name = data.provider or self.provider.name
 
@@ -49,6 +49,7 @@ class ChargeService:
 
         charge = await self.charge_repo.create(
             user_id=user_id,
+            organization_id=organization_id,
             customer_name=data.customer_name,
             amount=Decimal(str(result["amount"])) if result.get("amount") else data.amount,
             provider=provider_name,

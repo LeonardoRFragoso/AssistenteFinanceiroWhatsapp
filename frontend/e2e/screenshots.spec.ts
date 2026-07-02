@@ -88,12 +88,20 @@ test.describe('Generate screenshots', () => {
   });
 
   test('Sprint 10 - Advanced Analytics screenshot', async ({ page }) => {
-    await demoLogin(page);
-    await waitForDashboardReady(page);
+    await demoLoginAndWait(page);
     const analyticsSection = page.getByTestId('advanced-analytics-section');
     await expect(analyticsSection).toBeVisible({ timeout: 30000 });
     await analyticsSection.scrollIntoViewIfNeeded();
     await page.waitForTimeout(3000);
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/advanced-analytics.png`, fullPage: false });
+  });
+
+  test('Sprint 11 - Organization & Members screenshot', async ({ page }) => {
+    await demoLoginAndWait(page);
+    const orgSection = page.getByTestId('organization-section');
+    await expect(orgSection).toBeVisible({ timeout: 30000 });
+    await orgSection.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: `${SCREENSHOTS_DIR}/organization-members.png`, fullPage: false });
   });
 });

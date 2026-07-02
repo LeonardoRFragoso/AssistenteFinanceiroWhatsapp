@@ -1,5 +1,16 @@
 # Security Hardening — PayFlow AI
 
+## Multi-Tenant Security (Sprint 11)
+
+- **Organization isolation**: All priority models (charges, customers, templates, collection rules, logs, recurring tasks, pending actions) have `organization_id` FK. Data is filtered by organization context.
+- **RBAC enforcement**: 4 roles (owner, admin, finance, viewer) with 9 permissions. Mutating endpoints check `has_permission()` before executing.
+- **Role hierarchy**: owner > admin > finance > viewer. Higher roles inherit lower role permissions.
+- **Membership validation**: `get_current_organization` validates that the user is an active member of the requested organization before returning it.
+- **Owner protection**: Owner role cannot be assigned via member invitation. Owner cannot be deactivated.
+- **No cross-org data access**: Users can only access organizations they are members of. `X-Organization-ID` header is validated against membership.
+- **WhatsApp org context**: Charges created via WhatsApp are automatically associated with the user's default organization.
+- **No sensitive financial operations**: Multi-tenancy does not introduce any banking, Pix Out, or real payment operations.
+
 ## Analytics Security (Sprint 10)
 
 - **User isolation**: All analytics endpoints filter by `user_id` from `get_current_active_user`. No cross-user data leakage.

@@ -265,4 +265,38 @@ test.describe('Sprint 9 — Customer Intelligence E2E', () => {
     await page.waitForTimeout(2000);
     await expect(analyticsSection).toBeVisible({ timeout: 10000 });
   });
+
+  test('21. Organization section renders', async ({ page }) => {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(500);
+    const orgSection = page.getByTestId('organization-section');
+    await expect(orgSection).toBeVisible({ timeout: 30000 });
+    await orgSection.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1000);
+
+    const switcher = orgSection.getByTestId('organization-switcher');
+    await expect(switcher).toBeVisible({ timeout: 10000 });
+
+    const orgInfo = orgSection.getByTestId('organization-info');
+    await expect(orgInfo).toBeVisible({ timeout: 10000 });
+
+    const membersSection = orgSection.getByTestId('organization-members');
+    await expect(membersSection).toBeVisible({ timeout: 10000 });
+  });
+
+  test('22. Organization members list displays', async ({ page }) => {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(500);
+    const orgSection = page.getByTestId('organization-section');
+    await expect(orgSection).toBeVisible({ timeout: 30000 });
+    await orgSection.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1000);
+
+    const membersSection = orgSection.getByTestId('organization-members');
+    await expect(membersSection).toBeVisible({ timeout: 10000 });
+
+    const table = membersSection.locator('table tbody tr');
+    const rowCount = await table.count();
+    expect(rowCount).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -12,6 +12,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.core.database import Base
 from app.core.config import settings
 from app.models import User, Subscription, Transaction, Reminder, ConversationLog, Plan, PaymentEvent, ConversationState, Charge, PendingAction, ProviderEvent
+from app.models.organization import Organization, OrganizationMember
+from app.models.customer import Customer
+from app.models.message_template import MessageTemplate
+from app.models.collection_rule import CollectionRule
+from app.models.collection_message_log import CollectionMessageLog
+from app.models.recurring_task import RecurringTask, RecurringTaskLog
+from app.models.charge_reminder_log import ChargeReminderLog
+from app.models.charge_delivery_log import ChargeDeliveryLog
 
 config = context.config
 

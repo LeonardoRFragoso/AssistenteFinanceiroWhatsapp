@@ -620,6 +620,17 @@ async def handle_create_pix_charge(
         if not amount or not customer_name:
             return "Para criar uma cobrança, informe o valor e o nome do cliente. Exemplo: 'Gere uma cobrança de R$ 150 para João'"
 
+        from app.services.organization_service import OrganizationService
+        org_service = OrganizationService(db)
+        from app.models.user import User
+        from sqlalchemy import select
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        org_id = None
+        if user:
+            org = await org_service.ensure_default_organization(user)
+            org_id = org.id
+
         pending_service = PendingActionService(db)
         action = await pending_service.create_charge_action(
             user_id=user_id,
@@ -627,7 +638,8 @@ async def handle_create_pix_charge(
             customer_name=customer_name,
             description=description,
             customer_phone=customer_phone,
-            due_date=due_date
+            due_date=due_date,
+            organization_id=org_id,
         )
 
         return pending_service.format_charge_summary(action)

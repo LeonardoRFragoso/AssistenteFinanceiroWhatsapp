@@ -222,4 +222,20 @@ export const adminAPI = {
   getDashboard: (cacEstimate = 50) => api.get(`/admin/dashboard?cac_estimate=${cacEstimate}`),
 };
 
+export const organizationsAPI = {
+  list: () => api.get('/organizations'),
+  create: (data: { name: string; document?: string; email?: string; phone?: string }) =>
+    api.post('/organizations', data),
+  get: (id: number) => api.get(`/organizations/${id}`),
+  update: (id: number, data: { name?: string; document?: string; email?: string; phone?: string }) =>
+    api.put(`/organizations/${id}`, data),
+  listMembers: (orgId: number) => api.get(`/organizations/${orgId}/members`),
+  addMember: (orgId: number, data: { email: string; role: string }) =>
+    api.post(`/organizations/${orgId}/members`, data),
+  updateMember: (orgId: number, memberId: number, data: { role: string }) =>
+    api.put(`/organizations/${orgId}/members/${memberId}`, data),
+  deactivateMember: (orgId: number, memberId: number) =>
+    api.post(`/organizations/${orgId}/members/${memberId}/deactivate`),
+};
+
 export default api;

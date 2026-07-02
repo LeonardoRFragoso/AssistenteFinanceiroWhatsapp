@@ -6,7 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7+-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-261%20backend%20%2B%2027%20E2E-success)
+![Tests](https://img.shields.io/badge/Tests-289%20backend%20%2B%2029%20E2E-success)
 ![E2E](https://img.shields.io/badge/E2E-Playwright-orange?logo=playwright&logoColor=white)
 
 SaaS financeiro conversacional para gestão de cobranças via WhatsApp com dashboard web. IA processa linguagem natural, cria cobranças, envia links de pagamento e acompanha recebimentos — com confirmação explícita do usuário em cada operação.
