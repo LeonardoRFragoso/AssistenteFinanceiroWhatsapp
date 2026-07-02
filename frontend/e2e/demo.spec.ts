@@ -1,12 +1,25 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
-async function demoLogin(page: import('@playwright/test').Page) {
+async function demoLogin(page: Page) {
   await page.goto('/login');
   const demoBtn = page.getByRole('button', { name: /entrar como demo/i });
   await expect(demoBtn).toBeVisible({ timeout: 15000 });
   await demoBtn.click();
   await page.waitForURL(/\/dashboard/, { timeout: 45000 });
-  await page.waitForLoadState('networkidle');
+}
+
+async function waitForDashboardReady(page: Page) {
+  // Wait for the main loading spinner to disappear
+  await expect(page.getByText(/carregando seu dashboard/i)).toBeHidden({ timeout: 30000 });
+  // Wait for the charges heading to appear
+  await expect(page.getByRole('heading', { name: /cobranças/i })).toBeVisible({ timeout: 30000 });
+  // Wait for the charges table to be visible (not in loading state)
+  await expect(page.locator('table')).toBeVisible({ timeout: 20000 });
+  // Wait for charges loading spinner inside table area to disappear
+  const tableSpinner = page.locator('.animate-spin').first();
+  if (await tableSpinner.isVisible().catch(() => false)) {
+    await expect(tableSpinner).toBeHidden({ timeout: 15000 });
+  }
 }
 
 test.describe('Demo Mode E2E', () => {
@@ -32,24 +45,25 @@ test.describe('Demo Mode E2E', () => {
 
   test('4. Dashboard renders after demo login', async ({ page }) => {
     await demoLogin(page);
+    await expect(page.getByText(/carregando seu dashboard/i)).toBeHidden({ timeout: 30000 });
     await expect(page.locator('main')).toBeVisible({ timeout: 20000 });
   });
 
   test('5. Charge summary cards appear', async ({ page }) => {
     await demoLogin(page);
+    await expect(page.getByText(/carregando seu dashboard/i)).toBeHidden({ timeout: 30000 });
     await expect(page.getByText(/pendentes/i).first()).toBeVisible({ timeout: 25000 });
     await expect(page.getByText(/vencidas/i).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('6. Charges section with table appears', async ({ page }) => {
     await demoLogin(page);
-    await expect(page.getByRole('heading', { name: /cobranças/i })).toBeVisible({ timeout: 30000 });
-    await expect(page.locator('table')).toBeVisible({ timeout: 20000 });
+    await waitForDashboardReady(page);
   });
 
   test('7. Filter by Vencidas works', async ({ page }) => {
     await demoLogin(page);
-    await expect(page.getByRole('heading', { name: /cobranças/i })).toBeVisible({ timeout: 30000 });
+    await waitForDashboardReady(page);
     const vencidasBtn = page.getByRole('button', { name: /^vencidas$/i }).first();
     await expect(vencidasBtn).toBeVisible({ timeout: 15000 });
     await vencidasBtn.click({ force: true });
@@ -58,29 +72,32 @@ test.describe('Demo Mode E2E', () => {
 
   test('8. Search by customer works', async ({ page }) => {
     await demoLogin(page);
-    await expect(page.getByRole('heading', { name: /cobranças/i })).toBeVisible({ timeout: 30000 });
+    await waitForDashboardReady(page);
     const searchInput = page.getByPlaceholder(/buscar por cliente ou descrição/i);
     await expect(searchInput).toBeVisible({ timeout: 15000 });
     await searchInput.fill('Test');
     const buscarBtn = page.getByRole('button', { name: /^buscar$/i });
+    await expect(buscarBtn).toBeEnabled({ timeout: 10000 });
     await buscarBtn.click({ force: true });
     await page.waitForTimeout(1000);
   });
 
   test('9. Export CSV button works', async ({ page }) => {
     await demoLogin(page);
-    await expect(page.getByRole('heading', { name: /cobranças/i })).toBeVisible({ timeout: 30000 });
+    await waitForDashboardReady(page);
     const csvBtn = page.getByRole('button', { name: /csv/i }).first();
     await expect(csvBtn).toBeVisible({ timeout: 15000 });
+    await expect(csvBtn).toBeEnabled({ timeout: 10000 });
     await csvBtn.click({ force: true });
     await page.waitForTimeout(2000);
   });
 
   test('10. Export PDF button works', async ({ page }) => {
     await demoLogin(page);
-    await expect(page.getByRole('heading', { name: /cobranças/i })).toBeVisible({ timeout: 30000 });
+    await waitForDashboardReady(page);
     const pdfBtn = page.getByRole('button', { name: /pdf/i }).first();
     await expect(pdfBtn).toBeVisible({ timeout: 15000 });
+    await expect(pdfBtn).toBeEnabled({ timeout: 10000 });
     await pdfBtn.click({ force: true });
     await page.waitForTimeout(2000);
   });

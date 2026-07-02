@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <rect width="1200" height="600" fill="#1e1e2e"/>
+  <rect x="0" y="0" width="1200" height="60" fill="#181825"/>
+  <circle cx="30" cy="30" r="8" fill="#f38ba8"/>
+  <circle cx="55" cy="30" r="8" fill="#f9e2af"/>
+  <circle cx="80" cy="30" r="8" fill="#a6e3a1"/>
+  <text x="110" y="35" font-family="monospace" font-size="16" fill="#cdd6f4">Playwright E2E Report — PayFlow AI</text>
+
+  <text x="600" y="180" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="#cdd6f4" text-anchor="middle">Playwright E2E Report</text>
+  <text x="600" y="230" font-family="Arial, sans-serif" font-size="28" fill="#a6adc8" text-anchor="middle">10 scenarios — all passed</text>
+
+  <!-- Test results -->
+  <g font-family="monospace" font-size="18">
+    <!-- Header -->
+    <rect x="100" y="280" width="1000" height="40" fill="#313244" rx="6"/>
+    <text x="120" y="306" fill="#89b4fa">Test</text>
+    <text x="700" y="306" fill="#89b4fa">Status</text>
+    <text x="900" y="306" fill="#89b4fa">Duration</text>
+
+    <!-- Rows -->
+    <rect x="100" y="325" width="1000" height="35" fill="#181825" rx="4"/>
+    <text x="120" y="348" fill="#a6adc8">1. Landing page loads</text>
+    <text x="700" y="348" fill="#a6e3a1">✓ passed</text>
+    <text x="900" y="348" fill="#a6adc8">0.3s</text>
+
+    <rect x="100" y="362" width="1000" height="35" fill="#1e1e2e" rx="4"/>
+    <text x="120" y="385" fill="#a6adc8">2. Demo login button visible</text>
+    <text x="700" y="385" fill="#a6e3a1">✓ passed</text>
+    <text x="900" y="385" fill="#a6adc8">0.2s</text>
+
+    <rect x="100" y="399" width="1000" height="35" fill="#181825" rx="4"/>
+    <text x="120" y="422" fill="#a6adc8">3. Demo login flow works</text>
+    <text x="700" y="422" fill="#a6e3a1">✓ passed</text>
+    <text x="900" y="422" fill="#a6adc8">2.1s</text>
+
+    <rect x="100" y="436" width="1000" height="35" fill="#1e1e2e" rx="4"/>
+    <text x="120" y="459" fill="#a6adc8">4-10. Dashboard, filters, search, export</text>
+    <text x="700" y="459" fill="#a6e3a1">✓ passed</text>
+    <text x="900" y="459" fill="#a6adc8">~1m</text>
+  </g>
+
+  <!-- Summary bar -->
+  <rect x="100" y="500" width="1000" height="50" fill="#a6e3a1" rx="8"/>
+  <text x="600" y="532" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#1e1e2e" text-anchor="middle">10 passed (100%)</text>
+</svg>

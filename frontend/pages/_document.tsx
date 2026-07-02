@@ -22,6 +22,7 @@ export default function Document() {
         <meta name="twitter:description" content="Crie cobranças, envie links de pagamento e acompanhe recebimentos via WhatsApp com IA." />
 
         <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </Head>
       <body>
         <Main />
