@@ -94,10 +94,12 @@ class ChargeRepository:
         await self.db.refresh(charge)
         return charge
 
-    async def get_by_id(self, charge_id: int, user_id: Optional[int] = None) -> Optional[Charge]:
+    async def get_by_id(self, charge_id: int, user_id: Optional[int] = None, organization_id: Optional[int] = None) -> Optional[Charge]:
         query = select(Charge).where(Charge.id == charge_id)
         if user_id is not None:
             query = query.where(Charge.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
@@ -107,8 +109,10 @@ class ChargeRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_user(self, user_id: int, limit: int = 50, status: Optional[str] = None) -> List[Charge]:
+    async def get_by_user(self, user_id: int, limit: int = 50, status: Optional[str] = None, organization_id: Optional[int] = None) -> List[Charge]:
         query = select(Charge).where(Charge.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         if status:
             status_cond = _build_status_condition(status)
             if status_cond is not None:
@@ -117,54 +121,57 @@ class ChargeRepository:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
-    async def get_pending_by_user(self, user_id: int) -> List[Charge]:
+    async def get_pending_by_user(self, user_id: int, organization_id: Optional[int] = None) -> List[Charge]:
+        query = select(Charge).where(and_(Charge.user_id == user_id, Charge.status == ChargeStatus.PENDING))
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         result = await self.db.execute(
-            select(Charge)
-            .where(and_(Charge.user_id == user_id, Charge.status == ChargeStatus.PENDING))
-            .order_by(desc(Charge.created_at))
+            query.order_by(desc(Charge.created_at))
         )
         return list(result.scalars().all())
 
-    async def get_paid_by_user(self, user_id: int, limit: int = 10) -> List[Charge]:
+    async def get_paid_by_user(self, user_id: int, limit: int = 10, organization_id: Optional[int] = None) -> List[Charge]:
+        query = select(Charge).where(and_(Charge.user_id == user_id, Charge.status == ChargeStatus.PAID))
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         result = await self.db.execute(
-            select(Charge)
-            .where(and_(Charge.user_id == user_id, Charge.status == ChargeStatus.PAID))
-            .order_by(desc(Charge.paid_at))
-            .limit(limit)
+            query.order_by(desc(Charge.paid_at)).limit(limit)
         )
         return list(result.scalars().all())
 
-    async def get_overdue_by_user(self, user_id: int) -> List[Charge]:
+    async def get_overdue_by_user(self, user_id: int, organization_id: Optional[int] = None) -> List[Charge]:
         today = date.today()
-        result = await self.db.execute(
-            select(Charge)
-            .where(
-                and_(
-                    Charge.user_id == user_id,
-                    Charge.status == ChargeStatus.PENDING,
-                    Charge.due_date.isnot(None),
-                    Charge.due_date < today
-                )
+        query = select(Charge).where(
+            and_(
+                Charge.user_id == user_id,
+                Charge.status == ChargeStatus.PENDING,
+                Charge.due_date.isnot(None),
+                Charge.due_date < today
             )
-            .order_by(Charge.due_date)
+        )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
+        result = await self.db.execute(
+            query.order_by(Charge.due_date)
         )
         return list(result.scalars().all())
 
-    async def get_due_soon_by_user(self, user_id: int, days_ahead: int = 1) -> List[Charge]:
+    async def get_due_soon_by_user(self, user_id: int, days_ahead: int = 1, organization_id: Optional[int] = None) -> List[Charge]:
         today = date.today()
         threshold = today + timedelta(days=days_ahead)
-        result = await self.db.execute(
-            select(Charge)
-            .where(
-                and_(
-                    Charge.user_id == user_id,
-                    Charge.status == ChargeStatus.PENDING,
-                    Charge.due_date.isnot(None),
-                    Charge.due_date <= threshold,
-                    Charge.due_date >= today
-                )
+        query = select(Charge).where(
+            and_(
+                Charge.user_id == user_id,
+                Charge.status == ChargeStatus.PENDING,
+                Charge.due_date.isnot(None),
+                Charge.due_date <= threshold,
+                Charge.due_date >= today
             )
-            .order_by(Charge.due_date)
+        )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
+        result = await self.db.execute(
+            query.order_by(Charge.due_date)
         )
         return list(result.scalars().all())
 
@@ -200,7 +207,7 @@ class ChargeRepository:
         )
         return list(result.scalars().all())
 
-    async def get_summary(self, user_id: int) -> dict:
+    async def get_summary(self, user_id: int, organization_id: Optional[int] = None) -> dict:
         today = date.today()
 
         # Conditions:
@@ -268,6 +275,8 @@ class ChargeRepository:
                 )
             ).label("count_cancelled"),
         ).where(Charge.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
 
         result = await self.db.execute(query)
         row = result.one()
@@ -300,8 +309,8 @@ class ChargeRepository:
         await self.db.refresh(charge)
         return charge
 
-    async def cancel(self, charge_id: int, user_id: int) -> Optional[Charge]:
-        charge = await self.get_by_id(charge_id, user_id)
+    async def cancel(self, charge_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[Charge]:
+        charge = await self.get_by_id(charge_id, user_id, organization_id)
         if not charge or charge.status != ChargeStatus.PENDING:
             return None
         charge.status = ChargeStatus.CANCELLED
@@ -309,29 +318,31 @@ class ChargeRepository:
         await self.db.refresh(charge)
         return charge
 
-    async def find_by_customer_name(self, user_id: int, customer_name: str) -> List[Charge]:
-        result = await self.db.execute(
-            select(Charge)
-            .where(
-                and_(
-                    Charge.user_id == user_id,
-                    Charge.customer_name.ilike(f"%{customer_name}%")
-                )
+    async def find_by_customer_name(self, user_id: int, customer_name: str, organization_id: Optional[int] = None) -> List[Charge]:
+        query = select(Charge).where(
+            and_(
+                Charge.user_id == user_id,
+                Charge.customer_name.ilike(f"%{customer_name}%")
             )
-            .order_by(desc(Charge.created_at))
+        )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
+        result = await self.db.execute(
+            query.order_by(desc(Charge.created_at))
         )
         return list(result.scalars().all())
 
-    async def find_by_amount(self, user_id: int, amount: Decimal) -> List[Charge]:
-        result = await self.db.execute(
-            select(Charge)
-            .where(
-                and_(
-                    Charge.user_id == user_id,
-                    Charge.amount == amount
-                )
+    async def find_by_amount(self, user_id: int, amount: Decimal, organization_id: Optional[int] = None) -> List[Charge]:
+        query = select(Charge).where(
+            and_(
+                Charge.user_id == user_id,
+                Charge.amount == amount
             )
-            .order_by(desc(Charge.created_at))
+        )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
+        result = await self.db.execute(
+            query.order_by(desc(Charge.created_at))
         )
         return list(result.scalars().all())
 
@@ -346,6 +357,7 @@ class ChargeRepository:
         end_date: Optional[date] = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
+        organization_id: Optional[int] = None,
     ) -> Tuple[List[Charge], int]:
         """Return a paginated list of charges for a user with filters and sorting.
 
@@ -358,6 +370,9 @@ class ChargeRepository:
         """
         query = select(Charge).where(Charge.user_id == user_id)
         count_query = select(func.count(Charge.id)).where(Charge.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
+            count_query = count_query.where(Charge.organization_id == organization_id)
 
         if status:
             status_cond = _build_status_condition(status)

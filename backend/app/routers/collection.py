@@ -20,11 +20,12 @@ router = APIRouter(prefix="/collection", tags=["Collection Rules"])
 @router.get("/rules", response_model=CollectionRuleListResponse)
 async def list_rules(
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
     """List collection rules for the authenticated user."""
     service = CollectionService(db)
-    rules = await service.list_rules(current_user.id)
+    rules = await service.list_rules(current_user.id, organization_id=org.id)
     return {"items": rules, "total": len(rules)}
 
 
@@ -41,7 +42,7 @@ async def create_rule(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing collection rules")
     service = CollectionService(db)
     try:
-        rule = await service.create_rule(current_user.id, data)
+        rule = await service.create_rule(current_user.id, data, organization_id=org.id)
         return rule
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -59,7 +60,7 @@ async def deactivate_rule(
     if not has_permission(role, "manage_collection_rules"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing collection rules")
     service = CollectionService(db)
-    rule = await service.deactivate_rule(rule_id, current_user.id)
+    rule = await service.deactivate_rule(rule_id, current_user.id, organization_id=org.id)
     if not rule:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     return rule
@@ -69,6 +70,7 @@ async def deactivate_rule(
 async def get_overdue_followups(
     limit: int = Query(10, ge=1, le=50),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate draft follow-up messages for overdue charges.
@@ -77,7 +79,7 @@ async def get_overdue_followups(
     Sending requires explicit user confirmation.
     """
     service = CollectionService(db)
-    result = await service.generate_followup_previews(current_user.id, limit=limit)
+    result = await service.generate_followup_previews(current_user.id, limit=limit, organization_id=org.id)
     return result
 
 
@@ -85,9 +87,10 @@ async def get_overdue_followups(
 async def list_logs(
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
     """List recent collection message logs."""
     service = CollectionService(db)
-    logs = await service.list_logs(current_user.id, limit=limit)
+    logs = await service.list_logs(current_user.id, limit=limit, organization_id=org.id)
     return {"items": logs, "total": len(logs)}

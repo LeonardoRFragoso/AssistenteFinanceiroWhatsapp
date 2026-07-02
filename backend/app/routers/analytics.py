@@ -20,53 +20,88 @@ async def get_analytics_overview(
     start_date: Optional[date] = Query(None, description="Filter from this date"),
     end_date: Optional[date] = Query(None, description="Filter up to this date"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Get advanced analytics overview for the authenticated user."""
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeAnalyticsService(db)
-    return await service.get_overview(current_user.id, start_date, end_date)
+    return await service.get_overview(current_user.id, org.id, start_date, end_date)
 
 
 @router.get("/monthly-trends")
 async def get_monthly_trends(
     months: int = Query(6, ge=1, le=12, description="Number of months to include"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Get monthly trends for the authenticated user."""
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeAnalyticsService(db)
-    return await service.get_monthly_trends(current_user.id, months)
+    return await service.get_monthly_trends(current_user.id, org.id, months)
 
 
 @router.get("/aging")
 async def get_aging(
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Get aging buckets for overdue charges."""
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeAnalyticsService(db)
-    return await service.get_aging(current_user.id)
+    return await service.get_aging(current_user.id, org.id)
 
 
 @router.get("/customer-performance")
 async def get_customer_performance(
     limit: int = Query(10, ge=1, le=50, description="Max customers to return"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Get customer performance ranking."""
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeAnalyticsService(db)
-    return await service.get_customer_performance(current_user.id, limit)
+    return await service.get_customer_performance(current_user.id, org.id, limit)
 
 
 @router.get("/collection-performance")
 async def get_collection_performance(
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Get collection rule performance metrics."""
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeAnalyticsService(db)
-    return await service.get_collection_performance(current_user.id)
+    return await service.get_collection_performance(current_user.id, org.id)
 
 
 @router.get("/insights")
@@ -74,11 +109,18 @@ async def get_insights(
     start_date: Optional[date] = Query(None, description="Filter from this date"),
     end_date: Optional[date] = Query(None, description="Filter up to this date"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db),
 ):
     """Get textual insights in Portuguese based on analytics data."""
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeAnalyticsService(db)
-    return {"insights": await service.get_insights(current_user.id, start_date, end_date)}
+    return {"insights": await service.get_insights(current_user.id, org.id, start_date, end_date)}
 
 
 @router.get("/export.csv")
@@ -97,11 +139,11 @@ async def export_analytics_csv(
             detail="Your role does not allow exporting data",
         )
     service = ChargeAnalyticsService(db)
-    overview = await service.get_overview(current_user.id, start_date, end_date)
-    trends = await service.get_monthly_trends(current_user.id, months=6)
-    aging = await service.get_aging(current_user.id)
-    customer_perf = await service.get_customer_performance(current_user.id, limit=10)
-    insights = await service.get_insights(current_user.id, start_date, end_date)
+    overview = await service.get_overview(current_user.id, org.id, start_date, end_date)
+    trends = await service.get_monthly_trends(current_user.id, org.id, months=6)
+    aging = await service.get_aging(current_user.id, org.id)
+    customer_perf = await service.get_customer_performance(current_user.id, org.id, limit=10)
+    insights = await service.get_insights(current_user.id, org.id, start_date, end_date)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -158,11 +200,11 @@ async def export_analytics_pdf(
             detail="Your role does not allow exporting data",
         )
     service = ChargeAnalyticsService(db)
-    overview = await service.get_overview(current_user.id, start_date, end_date)
-    trends = await service.get_monthly_trends(current_user.id, months=6)
-    aging = await service.get_aging(current_user.id)
-    customer_perf = await service.get_customer_performance(current_user.id, limit=10)
-    insights = await service.get_insights(current_user.id, start_date, end_date)
+    overview = await service.get_overview(current_user.id, org.id, start_date, end_date)
+    trends = await service.get_monthly_trends(current_user.id, org.id, months=6)
+    aging = await service.get_aging(current_user.id, org.id)
+    customer_perf = await service.get_customer_performance(current_user.id, org.id, limit=10)
+    insights = await service.get_insights(current_user.id, org.id, start_date, end_date)
 
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

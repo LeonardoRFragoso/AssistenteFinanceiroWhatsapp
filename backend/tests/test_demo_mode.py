@@ -9,7 +9,7 @@ from app.models.charge import ChargeStatus
 from app.models.subscription import Subscription
 from app.main import app
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from unittest.mock import patch
 
 
@@ -238,8 +238,28 @@ class TestDemoUserIsolation:
         sub = Subscription(user_id=demo_user.id, plan="pro", status="active")
         test_session.add(sub)
 
+        from app.models.organization import Organization, OrganizationMember, OrganizationRole
+        demo_org = Organization(name="Demo Org", slug=f"demo-{demo_user.id}", owner_user_id=demo_user.id)
+        test_session.add(demo_org)
+        await test_session.flush()
+        test_session.add(OrganizationMember(
+            organization_id=demo_org.id, user_id=demo_user.id,
+            role=OrganizationRole.OWNER, active=True,
+            joined_at=datetime.now(timezone.utc),
+        ))
+        authed_org = Organization(name="Authed Org", slug=f"authed-{authed_user.id}", owner_user_id=authed_user.id)
+        test_session.add(authed_org)
+        await test_session.flush()
+        test_session.add(OrganizationMember(
+            organization_id=authed_org.id, user_id=authed_user.id,
+            role=OrganizationRole.OWNER, active=True,
+            joined_at=datetime.now(timezone.utc),
+        ))
+        await test_session.flush()
+
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_org.id,
             customer_name="My Private Charge",
             amount=Decimal("100.00"),
             provider="fake",
@@ -249,6 +269,7 @@ class TestDemoUserIsolation:
         ))
         test_session.add(Charge(
             user_id=demo_user.id,
+            organization_id=demo_org.id,
             customer_name="Demo Charge",
             amount=Decimal("50.00"),
             provider="fake",

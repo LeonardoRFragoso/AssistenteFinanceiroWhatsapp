@@ -39,10 +39,11 @@ def _validate_status(status: Optional[str]) -> Optional[str]:
 @router.get("/summary", response_model=ChargeSummaryResponse)
 async def get_charge_summary(
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db)
 ):
     service = ChargeService(db)
-    return await service.get_summary(current_user.id)
+    return await service.get_summary(current_user.id, organization_id=org.id)
 
 
 @router.post("/reminders/run")
@@ -73,6 +74,7 @@ async def list_charges(
     sort_order: str = Query("desc", description="Sort order: asc or desc"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Legacy limit param (backward compat)"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db)
 ):
     status = _validate_status(status)
@@ -80,7 +82,7 @@ async def list_charges(
 
     # Backward compat: if limit is provided, use old non-paginated path
     if limit is not None:
-        charges = await service.get_user_charges(current_user.id, limit=limit, status=status)
+        charges = await service.get_user_charges(current_user.id, limit=limit, status=status, organization_id=org.id)
         return PaginatedChargeListResponse(
             items=charges, total=len(charges), page=1, page_size=limit, total_pages=1
         )
@@ -95,6 +97,7 @@ async def list_charges(
         end_date=end_date,
         sort_by=sort_by,
         sort_order=sort_order,
+        organization_id=org.id,
     )
     return PaginatedChargeListResponse(**result)
 
@@ -106,9 +109,16 @@ async def export_charges_csv(
     end_date: Optional[date] = Query(None, description="Filter charges created up to this date (inclusive)"),
     search: Optional[str] = Query(None, description="Search by customer name or description"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db)
 ):
     await exports_limiter.check(current_user.id, "export_csv")
+    if not has_permission(role, "export_data"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow exporting data",
+        )
     """Export the authenticated user's charges as a CSV file."""
     status = _validate_status(status)
     service = ChargeService(db)
@@ -117,6 +127,7 @@ async def export_charges_csv(
         page=1, page_size=10000,
         status=status, search=search,
         start_date=start_date, end_date=end_date,
+        organization_id=org.id,
     )
     charges = result["items"]
 
@@ -160,9 +171,16 @@ async def export_charges_pdf(
     end_date: Optional[date] = Query(None, description="Filter charges created up to this date (inclusive)"),
     search: Optional[str] = Query(None, description="Search by customer name or description"),
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db)
 ):
     await exports_limiter.check(current_user.id, "export_pdf")
+    if not has_permission(role, "export_data"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow exporting data",
+        )
     """Export the authenticated user's charges as a PDF report."""
     status = _validate_status(status)
     from reportlab.lib.pagesizes import A4
@@ -178,9 +196,10 @@ async def export_charges_pdf(
         page=1, page_size=10000,
         status=status, search=search,
         start_date=start_date, end_date=end_date,
+        organization_id=org.id,
     )
     charges = result["items"]
-    summary = await service.get_summary(current_user.id)
+    summary = await service.get_summary(current_user.id, organization_id=org.id)
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
@@ -302,6 +321,8 @@ async def export_charges_pdf(
 @router.get("/analytics", response_model=ChargeAnalyticsResponse)
 async def get_charge_analytics(
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
     db: AsyncSession = Depends(get_db)
 ):
     """Return analytics metrics for the authenticated user's charges.
@@ -313,8 +334,13 @@ async def get_charge_analytics(
     overdue_rate = overdue / (pending + overdue)
     average_payment_time_hours = mean(paid_at - created_at) for paid charges
     """
+    if not has_permission(role, "view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow viewing analytics",
+        )
     service = ChargeService(db)
-    charges = await service.get_user_charges(current_user.id, limit=10000)
+    charges = await service.get_user_charges(current_user.id, limit=10000, organization_id=org.id)
 
     total_created = len(charges)
     total_paid = sum(1 for c in charges if c.status == ChargeStatus.PAID)
@@ -368,10 +394,11 @@ async def get_charge_analytics(
 async def get_charge(
     charge_id: int,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db)
 ):
     service = ChargeService(db)
-    charge = await service.get_charge(charge_id, current_user.id)
+    charge = await service.get_charge(charge_id, current_user.id, organization_id=org.id)
     if not charge:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -415,7 +442,7 @@ async def cancel_charge(
             detail="Your role does not allow cancelling charges",
         )
     service = ChargeService(db)
-    charge = await service.cancel_charge(charge_id, current_user.id)
+    charge = await service.cancel_charge(charge_id, current_user.id, organization_id=org.id)
     if not charge:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -428,6 +455,7 @@ async def cancel_charge(
 async def get_charge_qr_code(
     charge_id: int,
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db)
 ):
     """Return the sandbox QR code for a charge.
@@ -436,7 +464,7 @@ async def get_charge_qr_code(
     It points to the fake payment link for demonstration purposes only.
     """
     service = ChargeService(db)
-    charge = await service.get_charge(charge_id, current_user.id)
+    charge = await service.get_charge(charge_id, current_user.id, organization_id=org.id)
     if not charge:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

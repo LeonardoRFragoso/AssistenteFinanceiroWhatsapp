@@ -17,7 +17,7 @@ class RecurringTaskService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_task(self, user_id: int, data: RecurringTaskCreate) -> RecurringTask:
+    async def create_task(self, user_id: int, data: RecurringTaskCreate, organization_id: Optional[int] = None) -> RecurringTask:
         next_run = self._calculate_next_run(
             data.recurrence_type,
             data.day_of_week,
@@ -26,6 +26,7 @@ class RecurringTaskService:
 
         task = RecurringTask(
             user_id=user_id,
+            organization_id=organization_id,
             title=data.title,
             description=data.description,
             recurrence_type=data.recurrence_type,
@@ -40,23 +41,25 @@ class RecurringTaskService:
         logger.info(f"Recurring task {task.id} created for user {user_id}")
         return task
 
-    async def get_user_tasks(self, user_id: int) -> List[RecurringTask]:
+    async def get_user_tasks(self, user_id: int, organization_id: Optional[int] = None) -> List[RecurringTask]:
+        query = select(RecurringTask).where(RecurringTask.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(RecurringTask.organization_id == organization_id)
         result = await self.db.execute(
-            select(RecurringTask)
-            .where(RecurringTask.user_id == user_id)
-            .order_by(RecurringTask.next_run_at)
+            query.order_by(RecurringTask.next_run_at)
         )
         return list(result.scalars().all())
 
-    async def cancel_task(self, task_id: int, user_id: int) -> Optional[RecurringTask]:
-        result = await self.db.execute(
-            select(RecurringTask).where(
-                and_(
-                    RecurringTask.id == task_id,
-                    RecurringTask.user_id == user_id,
-                )
+    async def cancel_task(self, task_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[RecurringTask]:
+        query = select(RecurringTask).where(
+            and_(
+                RecurringTask.id == task_id,
+                RecurringTask.user_id == user_id,
             )
         )
+        if organization_id is not None:
+            query = query.where(RecurringTask.organization_id == organization_id)
+        result = await self.db.execute(query)
         task = result.scalar_one_or_none()
         if not task:
             return None

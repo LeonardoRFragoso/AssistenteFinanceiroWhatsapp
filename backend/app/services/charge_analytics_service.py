@@ -25,11 +25,14 @@ class ChargeAnalyticsService:
     async def _get_user_charges(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         status: Optional[str] = None,
     ) -> List[Charge]:
         query = select(Charge).where(Charge.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         if start_date:
             query = query.where(Charge.created_at >= start_date)
         if end_date:
@@ -65,10 +68,11 @@ class ChargeAnalyticsService:
     async def get_overview(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-        charges = await self._get_user_charges(user_id, start_date, end_date)
+        charges = await self._get_user_charges(user_id, organization_id, start_date, end_date)
         today = date.today()
 
         total_billed = sum((c.amount for c in charges), Decimal("0"))
@@ -113,23 +117,24 @@ class ChargeAnalyticsService:
         overdue_customers = set(c.customer_name for c in overdue_charges)
 
         # Followup stats
-        followup_result = await self.db.execute(
-            select(
-                func.count().label("total"),
-                func.sum(
-                    case(
-                        (CollectionMessageLog.status == CollectionMessageStatus.DRAFT, 1),
-                        else_=0,
-                    )
-                ).label("drafts"),
-                func.sum(
-                    case(
-                        (CollectionMessageLog.status == CollectionMessageStatus.SENT, 1),
-                        else_=0,
-                    )
-                ).label("sent"),
-            ).where(CollectionMessageLog.user_id == user_id)
-        )
+        followup_query = select(
+            func.count().label("total"),
+            func.sum(
+                case(
+                    (CollectionMessageLog.status == CollectionMessageStatus.DRAFT, 1),
+                    else_=0,
+                )
+            ).label("drafts"),
+            func.sum(
+                case(
+                    (CollectionMessageLog.status == CollectionMessageStatus.SENT, 1),
+                    else_=0,
+                )
+            ).label("sent"),
+        ).where(CollectionMessageLog.user_id == user_id)
+        if organization_id is not None:
+            followup_query = followup_query.where(CollectionMessageLog.organization_id == organization_id)
+        followup_result = await self.db.execute(followup_query)
         followup_row = followup_result.one()
 
         return {
@@ -155,12 +160,13 @@ class ChargeAnalyticsService:
     async def get_monthly_trends(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
         months: int = 6,
     ) -> List[Dict[str, Any]]:
         today = date.today()
         start = today.replace(day=1) - timedelta(days=months * 30)
 
-        charges = await self._get_user_charges(user_id, start_date=start)
+        charges = await self._get_user_charges(user_id, organization_id, start_date=start)
 
         trends = []
         for i in range(months):
@@ -208,9 +214,10 @@ class ChargeAnalyticsService:
     async def get_aging(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         today = date.today()
-        charges = await self._get_user_charges(user_id, status="overdue")
+        charges = await self._get_user_charges(user_id, organization_id, status="overdue")
 
         buckets = {
             "1-7 dias": [],
@@ -257,9 +264,10 @@ class ChargeAnalyticsService:
     async def get_customer_performance(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
-        charges = await self._get_user_charges(user_id)
+        charges = await self._get_user_charges(user_id, organization_id)
         today = date.today()
 
         # Group by customer_name
@@ -345,12 +353,16 @@ class ChargeAnalyticsService:
     async def get_collection_performance(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         # Total logs
+        logs_query = select(CollectionMessageLog).where(
+            CollectionMessageLog.user_id == user_id
+        )
+        if organization_id is not None:
+            logs_query = logs_query.where(CollectionMessageLog.organization_id == organization_id)
         logs_result = await self.db.execute(
-            select(CollectionMessageLog).where(
-                CollectionMessageLog.user_id == user_id
-            ).order_by(CollectionMessageLog.created_at.desc())
+            logs_query.order_by(CollectionMessageLog.created_at.desc())
         )
         logs = list(logs_result.scalars().all())
 
@@ -437,12 +449,13 @@ class ChargeAnalyticsService:
     async def get_insights(
         self,
         user_id: int,
+        organization_id: Optional[int] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> List[str]:
-        overview = await self.get_overview(user_id, start_date, end_date)
-        aging = await self.get_aging(user_id)
-        customer_perf = await self.get_customer_performance(user_id, limit=5)
+        overview = await self.get_overview(user_id, organization_id, start_date, end_date)
+        aging = await self.get_aging(user_id, organization_id)
+        customer_perf = await self.get_customer_performance(user_id, organization_id, limit=5)
 
         insights: List[str] = []
 

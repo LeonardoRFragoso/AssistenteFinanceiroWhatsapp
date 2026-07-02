@@ -33,18 +33,19 @@ async def create_recurring_task(
     if not has_permission(role, "manage_charges"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing recurring tasks")
     service = RecurringTaskService(db)
-    task = await service.create_task(current_user.id, task_data)
+    task = await service.create_task(current_user.id, task_data, organization_id=org.id)
     return task
 
 
 @router.get("", response_model=RecurringTaskListResponse)
 async def list_recurring_tasks(
     current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
     """List all recurring tasks for the current user."""
     service = RecurringTaskService(db)
-    tasks = await service.get_user_tasks(current_user.id)
+    tasks = await service.get_user_tasks(current_user.id, organization_id=org.id)
     return {"items": tasks, "total": len(tasks)}
 
 
@@ -60,7 +61,7 @@ async def cancel_recurring_task(
     if not has_permission(role, "manage_charges"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your role does not allow managing recurring tasks")
     service = RecurringTaskService(db)
-    task = await service.cancel_task(task_id, current_user.id)
+    task = await service.cancel_task(task_id, current_user.id, organization_id=org.id)
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

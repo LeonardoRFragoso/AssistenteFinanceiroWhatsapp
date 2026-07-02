@@ -72,14 +72,15 @@ class ChargeService:
                 user_id=user_id,
                 name=data.customer_name,
                 phone=data.customer_phone,
+                organization_id=organization_id,
             )
         except Exception as ce:
             logger.warning(f"Failed to auto-create customer for charge {charge.id}: {ce}")
 
         return charge
 
-    async def get_user_charges(self, user_id: int, limit: int = 50, status: Optional[str] = None) -> List[Charge]:
-        return await self.charge_repo.get_by_user(user_id, limit=limit, status=status)
+    async def get_user_charges(self, user_id: int, limit: int = 50, status: Optional[str] = None, organization_id: Optional[int] = None) -> List[Charge]:
+        return await self.charge_repo.get_by_user(user_id, limit=limit, status=status, organization_id=organization_id)
 
     async def get_charges_paginated(
         self,
@@ -92,6 +93,7 @@ class ChargeService:
         end_date: Optional[date] = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
+        organization_id: Optional[int] = None,
     ) -> dict:
         """Return paginated charges with total count and pagination metadata."""
         charges, total = await self.charge_repo.get_paginated(
@@ -104,6 +106,7 @@ class ChargeService:
             end_date=end_date,
             sort_by=sort_by,
             sort_order=sort_order,
+            organization_id=organization_id,
         )
         total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
         return {
@@ -114,11 +117,11 @@ class ChargeService:
             "total_pages": total_pages,
         }
 
-    async def get_charge(self, charge_id: int, user_id: Optional[int] = None) -> Optional[Charge]:
-        return await self.charge_repo.get_by_id(charge_id, user_id)
+    async def get_charge(self, charge_id: int, user_id: Optional[int] = None, organization_id: Optional[int] = None) -> Optional[Charge]:
+        return await self.charge_repo.get_by_id(charge_id, user_id, organization_id)
 
-    async def cancel_charge(self, charge_id: int, user_id: int) -> Optional[Charge]:
-        return await self.charge_repo.cancel(charge_id, user_id)
+    async def cancel_charge(self, charge_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[Charge]:
+        return await self.charge_repo.cancel(charge_id, user_id, organization_id)
 
     def get_derived_status(self, charge: Charge) -> str:
         """Return the effective status of a charge, considering overdue."""
@@ -127,28 +130,28 @@ class ChargeService:
                 return "overdue"
         return charge.status.value
 
-    async def get_summary(self, user_id: int) -> ChargeSummaryResponse:
+    async def get_summary(self, user_id: int, organization_id: Optional[int] = None) -> ChargeSummaryResponse:
         """Get charge summary statistics for a user."""
-        data = await self.charge_repo.get_summary(user_id)
+        data = await self.charge_repo.get_summary(user_id, organization_id)
         return ChargeSummaryResponse(**data)
 
-    async def get_pending_charges(self, user_id: int) -> List[Charge]:
-        return await self.charge_repo.get_pending_by_user(user_id)
+    async def get_pending_charges(self, user_id: int, organization_id: Optional[int] = None) -> List[Charge]:
+        return await self.charge_repo.get_pending_by_user(user_id, organization_id)
 
-    async def get_paid_charges(self, user_id: int, limit: int = 10) -> List[Charge]:
-        return await self.charge_repo.get_paid_by_user(user_id, limit=limit)
+    async def get_paid_charges(self, user_id: int, limit: int = 10, organization_id: Optional[int] = None) -> List[Charge]:
+        return await self.charge_repo.get_paid_by_user(user_id, limit=limit, organization_id=organization_id)
 
-    async def get_overdue_charges(self, user_id: int) -> List[Charge]:
-        return await self.charge_repo.get_overdue_by_user(user_id)
+    async def get_overdue_charges(self, user_id: int, organization_id: Optional[int] = None) -> List[Charge]:
+        return await self.charge_repo.get_overdue_by_user(user_id, organization_id)
 
-    async def find_charges_by_customer_name(self, user_id: int, name: str) -> List[Charge]:
-        return await self.charge_repo.find_by_customer_name(user_id, name)
+    async def find_charges_by_customer_name(self, user_id: int, name: str, organization_id: Optional[int] = None) -> List[Charge]:
+        return await self.charge_repo.find_by_customer_name(user_id, name, organization_id)
 
-    async def find_charges_by_amount(self, user_id: int, amount: Decimal) -> List[Charge]:
-        return await self.charge_repo.find_by_amount(user_id, amount)
+    async def find_charges_by_amount(self, user_id: int, amount: Decimal, organization_id: Optional[int] = None) -> List[Charge]:
+        return await self.charge_repo.find_by_amount(user_id, amount, organization_id)
 
-    async def get_latest_charge(self, user_id: int) -> Optional[Charge]:
-        charges = await self.charge_repo.get_by_user(user_id, limit=1)
+    async def get_latest_charge(self, user_id: int, organization_id: Optional[int] = None) -> Optional[Charge]:
+        charges = await self.charge_repo.get_by_user(user_id, limit=1, organization_id=organization_id)
         return charges[0] if charges else None
 
     async def process_payment_event(
