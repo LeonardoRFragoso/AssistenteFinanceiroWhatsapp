@@ -114,6 +114,42 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Para quem é */}
+      <section className="py-16 bg-white dark:bg-gray-900">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-12">Para quem é</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mb-4">
+                <Smartphone className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Autônomos</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Cobranças sem planilha. Envie links de pagamento pelo WhatsApp e acompanhe recebimentos no dashboard.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center mb-4">
+                <Receipt className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">MEIs</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Crie cobranças com vencimento, receba lembretes automáticos e exporte relatórios para contabilidade.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center mb-4">
+                <TrendingUp className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Pequenos negócios</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Acompanhe analytics: taxa de conversão, tempo médio de pagamento e taxa de vencimento em um dashboard.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Como funciona */}
       <section className="py-16 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -232,6 +268,91 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Por dentro da arquitetura */}
+      <section className="py-16 bg-white dark:bg-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">Por dentro da arquitetura</h2>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Backend async (FastAPI + SQLAlchemy 2.0)</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">I/O não-bloqueante para alto throughput com OpenAI, Twilio e PostgreSQL</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Provider factory pattern</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Provedor fake por padrão, Mercado Pago sandbox opt-in — troca via env var</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Bell className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Workers assíncronos (Redis + RQ)</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Lembretes de vencimento processados em background, sem bloquear requisições</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Confirmação explícita + PendingAction</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Toda cobrança exige confirmação do usuário antes de ser executada</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-rose-100 dark:bg-rose-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FileText className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">117 testes + 10 cenários E2E</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">pytest no backend, Playwright no frontend com CI manual via GitHub Actions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Projeto em sandbox/demo */}
+      <section className="py-16 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-sm font-medium mb-6">
+            <Shield className="w-4 h-4" />
+            Projeto sandbox
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Projeto em sandbox/demo</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            PayFlow AI é um projeto de portfólio. Não é uma instituição financeira.
+            Não oferece conta digital, Pix Out, saque ou pagamento de boletos.
+            O provider padrão é <strong>fake</strong> — nenhuma cobrança real é processada.
+            Mercado Pago sandbox é opt-in com credenciais explícitas.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <span className="text-gray-700 dark:text-gray-300">Provider fake por padrão</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <span className="text-gray-700 dark:text-gray-300">Demo mode seguro</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <span className="text-gray-700 dark:text-gray-300">Sem operações bancárias</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Roadmap */}
       <section className="py-16 bg-white dark:bg-gray-900">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -258,8 +379,16 @@ export default function Home() {
               <span className="text-sm text-gray-700 dark:text-gray-300">Sprint 5: Demo mode, landing page, deploy readiness</span>
             </div>
             <div className="flex items-center gap-3">
+              <Check className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Sprint 6-6.1: E2E, observabilidade, rate limiting, webhook hardening</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Sprint 7: Portfolio polish, case study, screenshots, release candidate</span>
+            </div>
+            <div className="flex items-center gap-3">
               <ArrowRight className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-              <span className="text-sm text-gray-500 dark:text-gray-400">Próximo: Testes E2E, observabilidade, multi-tenant</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Próximo: Multi-tenant, mais provedores, app mobile</span>
             </div>
           </div>
         </div>

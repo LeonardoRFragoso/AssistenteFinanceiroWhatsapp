@@ -42,7 +42,6 @@ class DemoService:
             user_id=user.id,
             plan="pro",
             status="active",
-            started_at=datetime.now(timezone.utc),
         )
         self.db.add(sub)
 
