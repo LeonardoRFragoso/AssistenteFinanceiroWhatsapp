@@ -25,6 +25,7 @@ class CustomerService:
         name: str,
         phone: Optional[str] = None,
         email: Optional[str] = None,
+        organization_id: Optional[int] = None,
     ) -> Customer:
         """Find or create a customer by normalized name/phone for the user."""
         normalized_name = name.strip().lower()
@@ -38,6 +39,8 @@ class CustomerService:
                 ),
             )
         )
+        if organization_id is not None:
+            query = query.where(Customer.organization_id == organization_id)
         result = await self.db.execute(query)
         customer = result.scalar_one_or_none()
 
@@ -54,6 +57,7 @@ class CustomerService:
 
         customer = Customer(
             user_id=user_id,
+            organization_id=organization_id,
             name=name.strip(),
             phone=phone,
             email=email,
@@ -64,12 +68,13 @@ class CustomerService:
         logger.info(f"Customer {customer.id} created for user {user_id}: {customer.name}")
         return customer
 
-    async def get_customer(self, customer_id: int, user_id: int) -> Optional[Customer]:
-        result = await self.db.execute(
-            select(Customer).where(
-                and_(Customer.id == customer_id, Customer.user_id == user_id)
-            )
+    async def get_customer(self, customer_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[Customer]:
+        query = select(Customer).where(
+            and_(Customer.id == customer_id, Customer.user_id == user_id)
         )
+        if organization_id is not None:
+            query = query.where(Customer.organization_id == organization_id)
+        result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def list_customers(
@@ -82,9 +87,12 @@ class CustomerService:
         sort_order: str = "desc",
         page: int = 1,
         page_size: int = 20,
+        organization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """List customers with pagination and filters."""
         query = select(Customer).where(Customer.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(Customer.organization_id == organization_id)
 
         if search:
             search_lower = search.lower()
@@ -112,7 +120,7 @@ class CustomerService:
 
         items = []
         for c in customers:
-            summary = await self.get_customer_summary(c, user_id)
+            summary = await self.get_customer_summary(c, user_id, organization_id)
             item = {
                 "id": c.id,
                 "name": c.name,
@@ -149,9 +157,9 @@ class CustomerService:
             "total_pages": total_pages,
         }
 
-    async def get_customer_charges(self, customer_id: int, user_id: int) -> List[Charge]:
+    async def get_customer_charges(self, customer_id: int, user_id: int, organization_id: Optional[int] = None) -> List[Charge]:
         """Get all charges for a customer, matched by name/phone."""
-        customer = await self.get_customer(customer_id, user_id)
+        customer = await self.get_customer(customer_id, user_id, organization_id)
         if not customer:
             return []
 
@@ -163,12 +171,14 @@ class CustomerService:
                     and_(Charge.customer_phone.isnot(None), Charge.customer_phone == customer.phone) if customer.phone else False,
                 ),
             )
-        ).order_by(Charge.created_at.desc())
+        )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
 
-        result = await self.db.execute(query)
+        result = await self.db.execute(query.order_by(Charge.created_at.desc()))
         return list(result.scalars().all())
 
-    async def get_customer_summary(self, customer: Customer, user_id: int) -> Dict[str, Any]:
+    async def get_customer_summary(self, customer: Customer, user_id: int, organization_id: Optional[int] = None) -> Dict[str, Any]:
         """Calculate summary metrics for a customer via queries (not persisted)."""
         name_lower = customer.name.lower()
         query = select(Charge).where(
@@ -180,6 +190,8 @@ class CustomerService:
                 ),
             )
         )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         result = await self.db.execute(query)
         charges = list(result.scalars().all())
 
@@ -269,14 +281,14 @@ class CustomerService:
 
         return CustomerStatus.NEW_CUSTOMER.value
 
-    async def get_customer_detail(self, customer_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    async def get_customer_detail(self, customer_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Get full customer detail with summary."""
-        customer = await self.get_customer(customer_id, user_id)
+        customer = await self.get_customer(customer_id, user_id, organization_id)
         if not customer:
             return None
 
-        summary = await self.get_customer_summary(customer, user_id)
-        charges = await self.get_customer_charges(customer_id, user_id)
+        summary = await self.get_customer_summary(customer, user_id, organization_id)
+        charges = await self.get_customer_charges(customer_id, user_id, organization_id)
 
         return {
             "id": customer.id,
@@ -302,8 +314,8 @@ class CustomerService:
             ],
         }
 
-    async def update_customer_notes(self, customer_id: int, user_id: int, notes: str) -> Optional[Customer]:
-        customer = await self.get_customer(customer_id, user_id)
+    async def update_customer_notes(self, customer_id: int, user_id: int, notes: str, organization_id: Optional[int] = None) -> Optional[Customer]:
+        customer = await self.get_customer(customer_id, user_id, organization_id)
         if not customer:
             return None
         customer.notes = notes

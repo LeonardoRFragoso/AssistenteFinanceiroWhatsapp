@@ -1,5 +1,17 @@
 # PayFlow AI — Release Notes
 
+## Sprint 11.1: Multi-Tenant Isolation Hardening
+
+- **Problem**: Sprint 11 added `organization_id` columns but routers/services still filtered only by `user_id`, allowing cross-org data leakage.
+- **Fix**: All org-scoped routers now inject `get_current_organization` and pass `org.id` to services. All services filter queries by `organization_id`.
+- **Routers updated**: charges, analytics, customers, message_templates, collection, recurring_tasks
+- **Services updated**: ChargeService, ChargeRepository, ChargeAnalyticsService, CustomerService, MessageTemplateService, CollectionService, RecurringTaskService, PendingActionService
+- **Exports**: CSV/PDF exports now filter by `organization_id`. RBAC enforced (viewer cannot export).
+- **WhatsApp**: Uses user's default organization. `PendingAction.organization_id` always populated.
+- **Migration** `h8c9d0e1f2g3`: Backfills `organization_id` on all existing records. Creates default org for users without one. Idempotent.
+- **Tests**: All test fixtures updated to create organizations and set `organization_id` on org-scoped records. 289 backend tests pass.
+- **Security**: `organization_id` is the primary data boundary. No cross-org data access. Users outside org receive 403.
+
 ## Sprint 11: Multi-Tenant SaaS — Organizations, RBAC e Workspaces
 
 - **Organization & OrganizationMember models** (`organization.py`): tabelas `organizations` e `organization_members` com roles (owner, admin, finance, viewer)

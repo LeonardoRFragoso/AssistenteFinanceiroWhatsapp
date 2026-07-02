@@ -18,18 +18,21 @@ class MessageTemplateService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_templates(self, user_id: int, active_only: bool = False) -> List[MessageTemplate]:
+    async def list_templates(self, user_id: int, active_only: bool = False, organization_id: Optional[int] = None) -> List[MessageTemplate]:
         query = select(MessageTemplate).where(MessageTemplate.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(MessageTemplate.organization_id == organization_id)
         if active_only:
             query = query.where(MessageTemplate.active == True)
         query = query.order_by(MessageTemplate.created_at.desc())
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
-    async def create_template(self, user_id: int, data: MessageTemplateCreate) -> MessageTemplate:
+    async def create_template(self, user_id: int, data: MessageTemplateCreate, organization_id: Optional[int] = None) -> MessageTemplate:
         self._validate_placeholders(data.template_text)
         template = MessageTemplate(
             user_id=user_id,
+            organization_id=organization_id,
             name=data.name,
             tone=data.tone,
             template_text=data.template_text,
@@ -41,8 +44,8 @@ class MessageTemplateService:
         logger.info(f"Message template {template.id} created for user {user_id}")
         return template
 
-    async def update_template(self, template_id: int, user_id: int, data: MessageTemplateUpdate) -> Optional[MessageTemplate]:
-        template = await self._get_template(template_id, user_id)
+    async def update_template(self, template_id: int, user_id: int, data: MessageTemplateUpdate, organization_id: Optional[int] = None) -> Optional[MessageTemplate]:
+        template = await self._get_template(template_id, user_id, organization_id)
         if not template:
             return None
         if data.name is not None:
@@ -56,8 +59,8 @@ class MessageTemplateService:
         await self.db.refresh(template)
         return template
 
-    async def deactivate_template(self, template_id: int, user_id: int) -> Optional[MessageTemplate]:
-        template = await self._get_template(template_id, user_id)
+    async def deactivate_template(self, template_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[MessageTemplate]:
+        template = await self._get_template(template_id, user_id, organization_id)
         if not template:
             return None
         template.active = False
@@ -65,8 +68,8 @@ class MessageTemplateService:
         await self.db.refresh(template)
         return template
 
-    async def get_template(self, template_id: int, user_id: int) -> Optional[MessageTemplate]:
-        return await self._get_template(template_id, user_id)
+    async def get_template(self, template_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[MessageTemplate]:
+        return await self._get_template(template_id, user_id, organization_id)
 
     def render_template(self, template_text: str, context: Dict[str, Any]) -> str:
         """Render a template with safe placeholder substitution.
@@ -97,17 +100,18 @@ class MessageTemplateService:
                 f"Allowed: {', '.join(sorted(ALLOWED_PLACEHOLDERS))}"
             )
 
-    async def _get_template(self, template_id: int, user_id: int) -> Optional[MessageTemplate]:
-        result = await self.db.execute(
-            select(MessageTemplate).where(
-                and_(MessageTemplate.id == template_id, MessageTemplate.user_id == user_id)
-            )
+    async def _get_template(self, template_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[MessageTemplate]:
+        query = select(MessageTemplate).where(
+            and_(MessageTemplate.id == template_id, MessageTemplate.user_id == user_id)
         )
+        if organization_id is not None:
+            query = query.where(MessageTemplate.organization_id == organization_id)
+        result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def seed_default_templates(self, user_id: int) -> None:
+    async def seed_default_templates(self, user_id: int, organization_id: Optional[int] = None) -> None:
         """Create default templates for a new user if they have none."""
-        existing = await self.list_templates(user_id)
+        existing = await self.list_templates(user_id, organization_id=organization_id)
         if existing:
             return
 
@@ -158,6 +162,6 @@ class MessageTemplateService:
         ]
 
         for tmpl in defaults:
-            await self.create_template(user_id, tmpl)
+            await self.create_template(user_id, tmpl, organization_id=organization_id)
 
         logger.info(f"Seeded {len(defaults)} default templates for user {user_id}")

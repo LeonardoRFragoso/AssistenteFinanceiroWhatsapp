@@ -24,15 +24,16 @@ class CollectionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_rule(self, user_id: int, data: CollectionRuleCreate) -> CollectionRule:
+    async def create_rule(self, user_id: int, data: CollectionRuleCreate, organization_id: Optional[int] = None) -> CollectionRule:
         if data.template_id:
             mt_service = MessageTemplateService(self.db)
-            template = await mt_service.get_template(data.template_id, user_id)
+            template = await mt_service.get_template(data.template_id, user_id, organization_id)
             if not template:
                 raise ValueError("Template not found")
 
         rule = CollectionRule(
             user_id=user_id,
+            organization_id=organization_id,
             name=data.name,
             days_offset=data.days_offset,
             trigger_type=data.trigger_type,
@@ -45,20 +46,24 @@ class CollectionService:
         logger.info(f"Collection rule {rule.id} created for user {user_id}")
         return rule
 
-    async def list_rules(self, user_id: int) -> List[CollectionRule]:
+    async def list_rules(self, user_id: int, organization_id: Optional[int] = None) -> List[CollectionRule]:
+        query = select(CollectionRule).where(
+            and_(CollectionRule.user_id == user_id, CollectionRule.active == True)
+        )
+        if organization_id is not None:
+            query = query.where(CollectionRule.organization_id == organization_id)
         result = await self.db.execute(
-            select(CollectionRule)
-            .where(and_(CollectionRule.user_id == user_id, CollectionRule.active == True))
-            .order_by(CollectionRule.days_offset.asc())
+            query.order_by(CollectionRule.days_offset.asc())
         )
         return list(result.scalars().all())
 
-    async def deactivate_rule(self, rule_id: int, user_id: int) -> Optional[CollectionRule]:
-        result = await self.db.execute(
-            select(CollectionRule).where(
-                and_(CollectionRule.id == rule_id, CollectionRule.user_id == user_id)
-            )
+    async def deactivate_rule(self, rule_id: int, user_id: int, organization_id: Optional[int] = None) -> Optional[CollectionRule]:
+        query = select(CollectionRule).where(
+            and_(CollectionRule.id == rule_id, CollectionRule.user_id == user_id)
         )
+        if organization_id is not None:
+            query = query.where(CollectionRule.organization_id == organization_id)
+        result = await self.db.execute(query)
         rule = result.scalar_one_or_none()
         if not rule:
             return None
@@ -67,17 +72,20 @@ class CollectionService:
         await self.db.refresh(rule)
         return rule
 
-    async def get_overdue_charges(self, user_id: int) -> List[Charge]:
+    async def get_overdue_charges(self, user_id: int, organization_id: Optional[int] = None) -> List[Charge]:
         """Get all overdue charges for a user."""
         today = date.today()
+        query = select(Charge).where(
+            and_(
+                Charge.user_id == user_id,
+                Charge.status == ChargeStatus.PENDING,
+                Charge.due_date < today,
+            )
+        )
+        if organization_id is not None:
+            query = query.where(Charge.organization_id == organization_id)
         result = await self.db.execute(
-            select(Charge).where(
-                and_(
-                    Charge.user_id == user_id,
-                    Charge.status == ChargeStatus.PENDING,
-                    Charge.due_date < today,
-                )
-            ).order_by(Charge.due_date.asc())
+            query.order_by(Charge.due_date.asc())
         )
         return list(result.scalars().all())
 
@@ -85,19 +93,20 @@ class CollectionService:
         self,
         user_id: int,
         limit: int = 10,
+        organization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Generate draft follow-up messages for overdue charges.
 
         Does NOT send any messages. Returns previews only.
         """
-        overdue = await self.get_overdue_charges(user_id)
+        overdue = await self.get_overdue_charges(user_id, organization_id)
         overdue = overdue[:limit]
 
         today = date.today()
         mt_service = MessageTemplateService(self.db)
         customer_service = CustomerService(self.db)
 
-        templates = await mt_service.list_templates(user_id, active_only=True)
+        templates = await mt_service.list_templates(user_id, active_only=True, organization_id=organization_id)
         firm_template = next(
             (t for t in templates if t.tone == MessageTone.FIRM),
             templates[0] if templates else None,
@@ -106,7 +115,7 @@ class CollectionService:
         items = []
         for charge in overdue:
             customer = await customer_service.get_or_create_customer(
-                user_id, charge.customer_name, charge.customer_phone
+                user_id, charge.customer_name, charge.customer_phone, organization_id=organization_id
             )
 
             days_overdue = (today - charge.due_date).days if charge.due_date else 0
@@ -162,10 +171,12 @@ class CollectionService:
         template_id: Optional[int],
         message_preview: str,
         status: CollectionMessageStatus = CollectionMessageStatus.DRAFT,
+        organization_id: Optional[int] = None,
     ) -> CollectionMessageLog:
         """Create a log entry for a collection message."""
         log = CollectionMessageLog(
             user_id=user_id,
+            organization_id=organization_id,
             charge_id=charge_id,
             customer_id=customer_id,
             template_id=template_id,
@@ -178,31 +189,32 @@ class CollectionService:
         await self.db.refresh(log)
         return log
 
-    async def already_sent_today(self, user_id: int, charge_id: int) -> bool:
+    async def already_sent_today(self, user_id: int, charge_id: int, organization_id: Optional[int] = None) -> bool:
         """Check if a follow-up was already sent/logged for this charge today."""
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        result = await self.db.execute(
-            select(func.count()).select_from(CollectionMessageLog).where(
-                and_(
-                    CollectionMessageLog.user_id == user_id,
-                    CollectionMessageLog.charge_id == charge_id,
-                    CollectionMessageLog.created_at >= today_start,
-                    CollectionMessageLog.status.in_([
-                        CollectionMessageStatus.DRAFT,
-                        CollectionMessageStatus.PENDING_CONFIRMATION,
-                        CollectionMessageStatus.SENT,
-                    ]),
-                )
+        query = select(func.count()).select_from(CollectionMessageLog).where(
+            and_(
+                CollectionMessageLog.user_id == user_id,
+                CollectionMessageLog.charge_id == charge_id,
+                CollectionMessageLog.created_at >= today_start,
+                CollectionMessageLog.status.in_([
+                    CollectionMessageStatus.DRAFT,
+                    CollectionMessageStatus.PENDING_CONFIRMATION,
+                    CollectionMessageStatus.SENT,
+                ]),
             )
         )
+        if organization_id is not None:
+            query = query.where(CollectionMessageLog.organization_id == organization_id)
+        result = await self.db.execute(query)
         count = result.scalar() or 0
         return count > 0
 
-    async def list_logs(self, user_id: int, limit: int = 20) -> List[CollectionMessageLog]:
+    async def list_logs(self, user_id: int, limit: int = 20, organization_id: Optional[int] = None) -> List[CollectionMessageLog]:
+        query = select(CollectionMessageLog).where(CollectionMessageLog.user_id == user_id)
+        if organization_id is not None:
+            query = query.where(CollectionMessageLog.organization_id == organization_id)
         result = await self.db.execute(
-            select(CollectionMessageLog)
-            .where(CollectionMessageLog.user_id == user_id)
-            .order_by(CollectionMessageLog.created_at.desc())
-            .limit(limit)
+            query.order_by(CollectionMessageLog.created_at.desc()).limit(limit)
         )
         return list(result.scalars().all())

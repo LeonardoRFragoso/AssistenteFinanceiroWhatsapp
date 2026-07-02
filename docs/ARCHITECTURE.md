@@ -134,10 +134,17 @@ ChargeService.get_charges_paginated()
 ### Core Models
 
 - **User**: email, phone, hashed_password, subscription
-- **Charge**: customer_name, amount, status (PENDING/PAID/CANCELLED/EXPIRED/FAILED), due_date, provider
+- **Organization**: name, slug, owner_user_id; multi-tenant workspace boundary
+- **OrganizationMember**: organization_id, user_id, role (owner/admin/finance/viewer)
+- **Charge**: customer_name, amount, status, due_date, provider, organization_id
+- **Customer**: name, phone, notes, organization_id
+- **MessageTemplate**: name, tone, template_text, organization_id
+- **CollectionRule**: days_offset, trigger_type, template_id, organization_id
+- **CollectionMessageLog**: charge_id, message_preview, status, organization_id
+- **RecurringTask**: title, recurrence_type, next_run_at, organization_id
 - **Transaction**: type (income/expense), category, amount, date
 - **Subscription**: plan (free/pro), status, started_at
-- **PendingAction**: AI-proposed action awaiting user confirmation
+- **PendingAction**: AI-proposed action awaiting user confirmation, organization_id
 - **ProviderEvent**: webhook event log from payment provider
 - **ChargeReminderLog**: reminder sent log
 - **ChargeDeliveryLog**: delivery confirmation log
@@ -153,6 +160,31 @@ This derived status is used consistently across:
 - CSV export (`GET /charges/export.csv?status=overdue`)
 - PDF export (`GET /charges/export.pdf?status=overdue`)
 - Summary metrics
+
+## Multi-Tenant Architecture (Sprint 11 + 11.1)
+
+### Organization as Data Boundary
+
+All org-scoped models have `organization_id` FK. Data access is filtered by `organization_id` as the primary boundary:
+
+- **Routers** inject `get_current_organization` (resolves via `X-Organization-ID` header or user's default org)
+- **Services** accept `organization_id` parameter and filter all queries
+- **Repositories** apply `.where(Model.organization_id == organization_id)` when provided
+- **Exports** (CSV/PDF) filter by `organization_id`; RBAC restricts export to finance/admin/owner
+- **WhatsApp** uses user's default organization for all operations
+
+### RBAC Roles & Permissions
+
+| Role | Permissions |
+|---|---|
+| owner | All 9 permissions |
+| admin | All except manage_settings |
+| finance | view_dashboard, manage_charges, manage_customers, manage_templates, view_analytics, export_data |
+| viewer | view_dashboard, view_analytics only |
+
+### Backfill Migration
+
+`h8c9d0e1f2g3` creates default organizations for users without one and backfills `organization_id` on all existing records. Idempotent.
 
 ## Security Decisions
 

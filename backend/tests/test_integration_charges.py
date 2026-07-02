@@ -13,10 +13,11 @@ from app.models.plan import Plan
 from app.models.conversation_log import ConversationLog
 from app.models.provider_event import ProviderEvent
 from app.models.pending_action import PendingAction
+from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.main import app
 from app.providers.provider_factory import get_payment_provider
 from decimal import Decimal
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 import app.providers.provider_factory as factory_module
 
 
@@ -57,8 +58,24 @@ async def authed_user(test_session):
         status="active"
     )
     test_session.add(sub)
+
+    org = Organization(
+        name="Test Org",
+        slug=f"test-org-{user.id}",
+        owner_user_id=user.id,
+    )
+    test_session.add(org)
+    await test_session.flush()
+    test_session.add(OrganizationMember(
+        organization_id=org.id,
+        user_id=user.id,
+        role=OrganizationRole.OWNER,
+        active=True,
+        joined_at=datetime.now(timezone.utc),
+    ))
     await test_session.commit()
 
+    user._org_id = org.id
     return user
 
 
@@ -80,8 +97,24 @@ async def other_user(test_session):
         status="active"
     )
     test_session.add(sub)
+
+    org = Organization(
+        name="Other Org",
+        slug=f"other-org-{user.id}",
+        owner_user_id=user.id,
+    )
+    test_session.add(org)
+    await test_session.flush()
+    test_session.add(OrganizationMember(
+        organization_id=org.id,
+        user_id=user.id,
+        role=OrganizationRole.OWNER,
+        active=True,
+        joined_at=datetime.now(timezone.utc),
+    ))
     await test_session.commit()
 
+    user._org_id = org.id
     return user
 
 
@@ -151,6 +184,7 @@ class TestChargesList:
     async def test_list_charges_with_data(self, client, auth_headers, authed_user, test_session):
         charge = Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Cliente Test",
             amount=Decimal("100.00"),
             provider="fake",
@@ -172,6 +206,7 @@ class TestChargesList:
         for i in range(25):
             test_session.add(Charge(
                 user_id=authed_user.id,
+                organization_id=authed_user._org_id,
                 customer_name=f"Cliente {i}",
                 amount=Decimal("50.00"),
                 provider="fake",
@@ -201,6 +236,7 @@ class TestChargesList:
     async def test_search(self, client, auth_headers, authed_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="João Silva",
             amount=Decimal("100.00"),
             provider="fake",
@@ -211,6 +247,7 @@ class TestChargesList:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Maria Santos",
             amount=Decimal("200.00"),
             provider="fake",
@@ -235,6 +272,7 @@ class TestChargesList:
     async def test_status_filter(self, client, auth_headers, authed_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pendente",
             amount=Decimal("100.00"),
             provider="fake",
@@ -244,6 +282,7 @@ class TestChargesList:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Paga",
             amount=Decimal("200.00"),
             provider="fake",
@@ -262,6 +301,7 @@ class TestChargesList:
     async def test_user_isolation(self, client, auth_headers, other_headers, authed_user, other_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="My Charge",
             amount=Decimal("100.00"),
             provider="fake",
@@ -271,6 +311,7 @@ class TestChargesList:
         ))
         test_session.add(Charge(
             user_id=other_user.id,
+            organization_id=other_user._org_id,
             customer_name="Other Charge",
             amount=Decimal("200.00"),
             provider="fake",
@@ -296,6 +337,7 @@ class TestChargesSummary:
     async def test_summary(self, client, auth_headers, authed_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Paga",
             amount=Decimal("200.00"),
             provider="fake",
@@ -330,6 +372,7 @@ class TestChargesAnalytics:
 
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Paid Charge",
             amount=Decimal("150.00"),
             provider="fake",
@@ -341,6 +384,7 @@ class TestChargesAnalytics:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending Charge",
             amount=Decimal("100.00"),
             provider="fake",
@@ -365,6 +409,7 @@ class TestChargesExport:
     async def test_export_csv(self, client, auth_headers, authed_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="CSV Test",
             amount=Decimal("100.00"),
             provider="fake",
@@ -390,6 +435,7 @@ class TestChargesExport:
     async def test_export_pdf(self, client, auth_headers, authed_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="PDF Test",
             amount=Decimal("100.00"),
             provider="fake",
@@ -439,6 +485,7 @@ class TestChargesCancel:
     async def test_cancel_pending(self, client, auth_headers, authed_user, test_session):
         charge = Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Cancel Me",
             amount=Decimal("100.00"),
             provider="fake",
@@ -458,6 +505,7 @@ class TestChargesCancel:
     async def test_cancel_paid_fails(self, client, auth_headers, authed_user, test_session):
         charge = Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Already Paid",
             amount=Decimal("100.00"),
             provider="fake",
@@ -476,6 +524,7 @@ class TestChargesCancel:
     async def test_cancel_other_user_charge(self, client, auth_headers, other_user, test_session):
         charge = Charge(
             user_id=other_user.id,
+            organization_id=other_user._org_id,
             customer_name="Other User Charge",
             amount=Decimal("100.00"),
             provider="fake",
@@ -496,6 +545,7 @@ class TestFakeWebhook:
     async def test_simulate_payment(self, client, authed_user, test_session):
         charge = Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pay Me",
             amount=Decimal("100.00"),
             provider="fake",
@@ -526,6 +576,7 @@ class TestDerivedStatusFilters:
         today = date.today()
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Overdue Charge",
             amount=Decimal("100.00"),
             provider="fake",
@@ -536,6 +587,7 @@ class TestDerivedStatusFilters:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending Not Overdue",
             amount=Decimal("50.00"),
             provider="fake",
@@ -546,6 +598,7 @@ class TestDerivedStatusFilters:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending No Due Date",
             amount=Decimal("30.00"),
             provider="fake",
@@ -567,6 +620,7 @@ class TestDerivedStatusFilters:
         today = date.today()
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Overdue Should Be Excluded",
             amount=Decimal("100.00"),
             provider="fake",
@@ -577,6 +631,7 @@ class TestDerivedStatusFilters:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending With Future Due",
             amount=Decimal("50.00"),
             provider="fake",
@@ -587,6 +642,7 @@ class TestDerivedStatusFilters:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending No Due Date",
             amount=Decimal("30.00"),
             provider="fake",
@@ -610,6 +666,7 @@ class TestDerivedStatusFilters:
     async def test_status_cancelled_returns_cancelled(self, client, auth_headers, authed_user, test_session):
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Cancelled One",
             amount=Decimal("100.00"),
             provider="fake",
@@ -619,6 +676,7 @@ class TestDerivedStatusFilters:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending One",
             amount=Decimal("50.00"),
             provider="fake",
@@ -651,6 +709,7 @@ class TestDateRangeInclusivity:
 
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Start Of Day",
             amount=Decimal("10.00"),
             provider="fake",
@@ -661,6 +720,7 @@ class TestDateRangeInclusivity:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Mid Day",
             amount=Decimal("20.00"),
             provider="fake",
@@ -671,6 +731,7 @@ class TestDateRangeInclusivity:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="End Of Day",
             amount=Decimal("30.00"),
             provider="fake",
@@ -699,6 +760,7 @@ class TestDateRangeInclusivity:
 
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Before Range",
             amount=Decimal("10.00"),
             provider="fake",
@@ -709,6 +771,7 @@ class TestDateRangeInclusivity:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="In Range",
             amount=Decimal("20.00"),
             provider="fake",
@@ -735,6 +798,7 @@ class TestExportWithDerivedStatus:
         today = date.today()
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Overdue For CSV",
             amount=Decimal("100.00"),
             provider="fake",
@@ -745,6 +809,7 @@ class TestExportWithDerivedStatus:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending For CSV",
             amount=Decimal("50.00"),
             provider="fake",
@@ -766,6 +831,7 @@ class TestExportWithDerivedStatus:
         today = date.today()
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Overdue Excluded",
             amount=Decimal("100.00"),
             provider="fake",
@@ -776,6 +842,7 @@ class TestExportWithDerivedStatus:
         ))
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Pending Included",
             amount=Decimal("50.00"),
             provider="fake",
@@ -797,6 +864,7 @@ class TestExportWithDerivedStatus:
         today = date.today()
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Overdue For PDF",
             amount=Decimal("100.00"),
             provider="fake",
@@ -816,6 +884,7 @@ class TestExportWithDerivedStatus:
         today = date.today()
         test_session.add(Charge(
             user_id=authed_user.id,
+            organization_id=authed_user._org_id,
             customer_name="Date Range PDF",
             amount=Decimal("100.00"),
             provider="fake",

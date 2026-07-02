@@ -1,5 +1,16 @@
 # Security Hardening — PayFlow AI
 
+## Multi-Tenant Isolation Hardening (Sprint 11.1)
+
+- **Organization_id as primary data boundary**: All org-scoped routers now inject `get_current_organization` and pass `org.id` to every service call. Services filter all queries by `organization_id` in addition to `user_id`.
+- **Full router coverage**: charges, analytics, customers, message_templates, collection, recurring_tasks — all endpoints enforce org filtering.
+- **Export isolation**: CSV/PDF exports (charges and analytics) filter by `organization_id`. Data from org A never appears in org B's export.
+- **RBAC on exports**: `viewer` role cannot export data. `finance`, `admin`, and `owner` can export.
+- **WhatsApp org context**: Charges created via WhatsApp are associated with the user's default organization. `PendingAction.organization_id` is always populated.
+- **Backfill migration**: `h8c9d0e1f2g3` creates default organizations for users without one and backfills `organization_id` on all existing records. Idempotent, no data deletion.
+- **Test coverage**: All test fixtures create organizations and set `organization_id` on org-scoped records. 289 backend tests pass with 0 failures.
+- **No cross-org data access**: Users can only access data within their current organization context. `X-Organization-ID` header is validated against membership.
+
 ## Multi-Tenant Security (Sprint 11)
 
 - **Organization isolation**: All priority models (charges, customers, templates, collection rules, logs, recurring tasks, pending actions) have `organization_id` FK. Data is filtered by organization context.

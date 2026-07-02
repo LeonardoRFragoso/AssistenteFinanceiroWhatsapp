@@ -12,8 +12,9 @@ from app.models.customer import Customer
 from app.models.message_template import MessageTemplate
 from app.models.collection_rule import CollectionRule
 from app.models.collection_message_log import CollectionMessageLog
-from app.models.organization import Organization, OrganizationMember
+from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.recurring_task import RecurringTask, RecurringTaskLog
+from datetime import datetime, timezone
 
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -44,3 +45,26 @@ async def sample_user(db_session):
     await db_session.commit()
     await db_session.refresh(user)
     return user
+
+
+@pytest_asyncio.fixture
+async def sample_organization(db_session, sample_user):
+    """Create a default organization for the sample user."""
+    org = Organization(
+        name="Test Org",
+        slug=f"test-org-{sample_user.id}",
+        owner_user_id=sample_user.id,
+    )
+    db_session.add(org)
+    await db_session.flush()
+    member = OrganizationMember(
+        organization_id=org.id,
+        user_id=sample_user.id,
+        role=OrganizationRole.OWNER,
+        active=True,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db_session.add(member)
+    await db_session.commit()
+    await db_session.refresh(org)
+    return org
