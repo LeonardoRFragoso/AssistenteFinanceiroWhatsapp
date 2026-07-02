@@ -168,6 +168,49 @@ export const collectionAPI = {
   listLogs: (limit?: number) => api.get(`/collection/logs${limit ? `?limit=${limit}` : ''}`),
 };
 
+export const analyticsAPI = {
+  getOverview: (params?: { start_date?: string; end_date?: string }) => {
+    let url = '/analytics/overview';
+    const sp = new URLSearchParams();
+    if (params?.start_date) sp.append('start_date', params.start_date);
+    if (params?.end_date) sp.append('end_date', params.end_date);
+    const qs = sp.toString();
+    if (qs) url += `?${qs}`;
+    return api.get(url);
+  },
+  getMonthlyTrends: (months?: number) => api.get(`/analytics/monthly-trends${months ? `?months=${months}` : ''}`),
+  getAging: () => api.get('/analytics/aging'),
+  getCustomerPerformance: (limit?: number) => api.get(`/analytics/customer-performance${limit ? `?limit=${limit}` : ''}`),
+  getCollectionPerformance: () => api.get('/analytics/collection-performance'),
+  getInsights: (params?: { start_date?: string; end_date?: string }) => {
+    let url = '/analytics/insights';
+    const sp = new URLSearchParams();
+    if (params?.start_date) sp.append('start_date', params.start_date);
+    if (params?.end_date) sp.append('end_date', params.end_date);
+    const qs = sp.toString();
+    if (qs) url += `?${qs}`;
+    return api.get(url);
+  },
+  exportCSV: (params?: { start_date?: string; end_date?: string }) => {
+    let url = '/analytics/export.csv';
+    const sp = new URLSearchParams();
+    if (params?.start_date) sp.append('start_date', params.start_date);
+    if (params?.end_date) sp.append('end_date', params.end_date);
+    const qs = sp.toString();
+    if (qs) url += `?${qs}`;
+    return api.get(url, { responseType: 'blob' });
+  },
+  exportPDF: (params?: { start_date?: string; end_date?: string }) => {
+    let url = '/analytics/export.pdf';
+    const sp = new URLSearchParams();
+    if (params?.start_date) sp.append('start_date', params.start_date);
+    if (params?.end_date) sp.append('end_date', params.end_date);
+    const qs = sp.toString();
+    if (qs) url += `?${qs}`;
+    return api.get(url, { responseType: 'blob' });
+  },
+};
+
 export const adminAPI = {
   getMetrics: () => api.get('/admin/metrics'),
   getFunnel: () => api.get('/admin/funnel'),

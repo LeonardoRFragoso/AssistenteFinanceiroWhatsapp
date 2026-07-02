@@ -341,6 +341,21 @@ async def process_intent(
         elif intent == "list_message_templates":
             return await handle_list_message_templates(user_id, entities, db, ai_service, context)
 
+        elif intent == "analytics_overview":
+            return await handle_analytics_overview(user_id, entities, db, ai_service, context)
+
+        elif intent == "monthly_trends_summary":
+            return await handle_monthly_trends_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "aging_summary":
+            return await handle_aging_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "customer_performance_summary":
+            return await handle_customer_performance_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "collection_performance_summary":
+            return await handle_collection_performance_summary(user_id, entities, db, ai_service, context)
+
         elif intent == "cancel_charge":
             return await handle_cancel_charge(user_id, entities, db, ai_service, context)
 
@@ -1468,3 +1483,174 @@ async def handle_list_message_templates(
     except Exception as e:
         logger.error(f"Error listing message templates: {str(e)}")
         return "Erro ao listar templates. Tente novamente."
+
+
+async def handle_analytics_overview(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.charge_analytics_service import ChargeAnalyticsService
+        service = ChargeAnalyticsService(db)
+        overview = await service.get_overview(user_id)
+
+        if overview["total_charges"] == 0:
+            return "Você ainda não tem cobranças para analisar. Crie algumas cobranças para começar a acompanhar sua performance."
+
+        message = "📊 *Visão Geral das Cobranças*\n\n"
+        message += f"💰 Total cobrado: R$ {overview['total_billed']:.2f}\n"
+        message += f"✅ Total recebido: R$ {overview['total_paid']:.2f}\n"
+        message += f"⏳ Pendente: R$ {overview['total_pending']:.2f}\n"
+        message += f"🔴 Vencido: R$ {overview['total_overdue']:.2f}\n\n"
+        message += f"📈 Taxa de recebimento: {overview['collection_rate']:.1f}%\n"
+        message += f"📉 Taxa de vencimento: {overview['overdue_rate']:.1f}%\n"
+
+        if overview["average_payment_time_days"] is not None:
+            message += f"⏱️ Tempo médio de pagamento: {overview['average_payment_time_days']:.0f} dia(s)\n"
+
+        if overview["average_delay_days"] is not None:
+            message += f"⚠️ Atraso médio: {overview['average_delay_days']:.0f} dia(s)\n"
+
+        message += f"\n👥 Clientes ativos: {overview['active_customers']}\n"
+        message += f"👥 Clientes com vencido: {overview['overdue_customers']}\n"
+
+        if overview["followups_drafted"] > 0:
+            message += f"\n📝 Rascunhos de cobrança: {overview['followups_drafted']}\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in analytics overview: {str(e)}")
+        return "Erro ao gerar visão geral. Tente novamente."
+
+
+async def handle_monthly_trends_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.charge_analytics_service import ChargeAnalyticsService
+        service = ChargeAnalyticsService(db)
+        trends = await service.get_monthly_trends(user_id, months=3)
+
+        if not trends or all(t["billed_amount"] == 0 for t in trends):
+            return "Ainda não há dados suficientes para mostrar tendências mensais."
+
+        message = "📈 *Tendências Mensais (últimos 3 meses)*\n\n"
+        for t in trends:
+            message += f"📅 {t['month']}\n"
+            message += f"   Cobrado: R$ {t['billed_amount']:.2f}\n"
+            message += f"   Recebido: R$ {t['paid_amount']:.2f}\n"
+            message += f"   Taxa: {t['collection_rate']:.1f}%\n\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in monthly trends: {str(e)}")
+        return "Erro ao gerar tendências mensais. Tente novamente."
+
+
+async def handle_aging_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.charge_analytics_service import ChargeAnalyticsService
+        service = ChargeAnalyticsService(db)
+        aging = await service.get_aging(user_id)
+
+        if aging["total_overdue"] == 0:
+            return "✅ Você não tem cobranças vencidas! Tudo em dia."
+
+        message = f"⏰ *Aging de Cobranças Vencidas ({aging['total_overdue']} cobrança(s))*\n\n"
+        for b in aging["buckets"]:
+            if b["count"] > 0:
+                message += f"📌 {b['bucket']}: {b['count']} cobrança(s) — R$ {b['amount']:.2f} ({b['percentage']:.1f}%)\n"
+
+        message += f"\n💰 Total vencido: R$ {aging['total_overdue_amount']:.2f}"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in aging summary: {str(e)}")
+        return "Erro ao gerar aging. Tente novamente."
+
+
+async def handle_customer_performance_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.charge_analytics_service import ChargeAnalyticsService
+        service = ChargeAnalyticsService(db)
+        ranking = await service.get_customer_performance(user_id, limit=5)
+
+        if not ranking:
+            return "Você ainda não tem clientes com cobranças para analisar."
+
+        message = "👥 *Top 5 Clientes — Performance*\n\n"
+        for i, c in enumerate(ranking, 1):
+            status_label = {
+                "good_payer": "✅ Bom pagador",
+                "late_payer": "⚠️ Atrasa",
+                "frequent_late": "🔴 Atrasa muito",
+                "new_customer": "🆕 Novo",
+                "inactive_customer": "💤 Inativo",
+            }.get(c.get("operational_status", ""), c.get("operational_status", ""))
+            message += f"{i}. {c['customer_name']} — {status_label}\n"
+            message += f"   Cobrado: R$ {c['total_billed']:.2f} | Pago: R$ {c['total_paid']:.2f}\n"
+            if c["total_overdue"] > 0:
+                message += f"   🔴 Vencido: R$ {c['total_overdue']:.2f}\n"
+            message += f"   Sugestão: {c['suggested_action'].replace('_', ' ')}\n\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in customer performance: {str(e)}")
+        return "Erro ao gerar ranking de clientes. Tente novamente."
+
+
+async def handle_collection_performance_summary(
+    user_id: int,
+    entities: dict,
+    db: AsyncSession,
+    ai_service: AIService,
+    context: str
+) -> str:
+    try:
+        from app.services.charge_analytics_service import ChargeAnalyticsService
+        service = ChargeAnalyticsService(db)
+        perf = await service.get_collection_performance(user_id)
+
+        if perf["insufficient_data"]:
+            return "Ainda não há dados suficientes sobre a régua de cobrança. Continue usando os rascunhos de cobrança para acumular histórico."
+
+        message = "📋 *Performance da Régua de Cobrança*\n\n"
+        message += f"📝 Total de rascunhos: {perf['total_drafts']}\n"
+        message += f"👥 Clientes contatados: {perf['customers_contacted']}\n"
+        message += f"📊 Rascunhos este mês: {perf['followups_this_month']}\n"
+        message += f"🔗 Cobranças com follow-up: {perf['charges_with_followup']}\n"
+
+        if perf["charges_paid_after_followup"] > 0:
+            message += f"✅ Pagas após follow-up: {perf['charges_paid_after_followup']}\n"
+            message += f"💰 Valor recuperado estimado: R$ {perf['estimated_recovered_amount']:.2f}\n"
+
+        if perf["drafts_by_status"]:
+            message += "\n📊 Por status:\n"
+            for status, count in perf["drafts_by_status"].items():
+                message += f"   {status}: {count}\n"
+
+        message += "\n⚠️ Lembre-se: a régua não envia mensagens automaticamente. Tudo precisa de confirmação explícita."
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in collection performance: {str(e)}")
+        return "Erro ao gerar performance de cobrança. Tente novamente."

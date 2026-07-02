@@ -1,5 +1,14 @@
 # Security Hardening — PayFlow AI
 
+## Analytics Security (Sprint 10)
+
+- **User isolation**: All analytics endpoints filter by `user_id` from `get_current_active_user`. No cross-user data leakage.
+- **No credit scoring**: Analytics are operational only. `CustomerStatus` and suggested actions are not credit scores or financial decisions.
+- **No alarmism**: Insights use neutral, operational language. No crisis language, no risk warnings, no financial recommendations.
+- **No banking operations**: Analytics endpoints are read-only. No Pix Out, no real payments, no Open Finance.
+- **QR Code sandbox**: Analytics does not interact with QR codes or payment providers.
+- **Export safety**: CSV/PDF exports contain only the authenticated user's data, filtered by `user_id`.
+
 ## Demo Mode Security (Sprint 5.1)
 
 - **Demo mode never runs in production**: `validate_demo_mode()` fails startup if `ENVIRONMENT=production` and `ENABLE_DEMO_MODE=true`

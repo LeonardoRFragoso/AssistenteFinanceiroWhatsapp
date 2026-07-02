@@ -86,4 +86,14 @@ test.describe('Generate screenshots', () => {
     await page.waitForTimeout(1000);
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/collection-rules.png`, fullPage: true });
   });
+
+  test('Sprint 10 - Advanced Analytics screenshot', async ({ page }) => {
+    await demoLogin(page);
+    await waitForDashboardReady(page);
+    const analyticsSection = page.getByTestId('advanced-analytics-section');
+    await expect(analyticsSection).toBeVisible({ timeout: 30000 });
+    await analyticsSection.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: `${SCREENSHOTS_DIR}/advanced-analytics.png`, fullPage: false });
+  });
 });

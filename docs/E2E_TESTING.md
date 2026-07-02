@@ -88,7 +88,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
 
 ## Test Scenarios
 
-`frontend/e2e/demo.spec.ts` covers 18 scenarios:
+`frontend/e2e/demo.spec.ts` covers 20 scenarios:
 
 1. **Landing page loads** — Verifies h1 is visible
 2. **Demo login button visible** — Checks "Entrar na Demo" button on landing
@@ -108,6 +108,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
 16. **Template preview button works** — Clicks preview button if templates exist, verifies rendered text (Sprint 9)
 17. **Collection rules tab: content, empty state, and no auto-send** — Clicks collection tab, verifies headings, warning, and no "Enviar" button (Sprint 9)
 18. **QR Code sandbox modal and exports work** — Opens QR modal, verifies sandbox warning, closes, exports CSV and PDF (Sprint 9)
+19. **Advanced Analytics section renders** — Verifies analytics section, cards, period filter, and export buttons (Sprint 10)
+20. **Analytics period filter changes data** — Changes period select, verifies section reloads (Sprint 10)
 
 Sprint 9 tests (11-18) use **serial mode** with a shared login session to reduce backend load.
 
@@ -124,6 +126,16 @@ The following `data-testid` attributes are used for stable E2E selectors:
 | `customer-search-input` | Search input | Customer search field |
 | `message-template-preview-button` | Preview button | Template preview rendering |
 | `qr-code-modal` | QR Code modal overlay | Sandbox QR modal |
+| `advanced-analytics-section` | AdvancedAnalyticsSection container | Analytics section visibility |
+| `analytics-overview-cards` | Overview cards grid | Analytics overview cards |
+| `analytics-period-filter` | Period select dropdown | Filter by time period |
+| `analytics-export-csv` | CSV export button | Export analytics as CSV |
+| `analytics-export-pdf` | PDF export button | Export analytics as PDF |
+| `analytics-monthly-trends` | Monthly trends chart section | Trends chart visibility |
+| `analytics-aging` | Aging chart section | Aging chart visibility |
+| `analytics-customer-performance` | Customer ranking table | Customer performance table |
+| `analytics-collection-performance` | Collection performance cards | Collection metrics cards |
+| `analytics-insights` | Insights section | Textual insights display |
 
 ### Test strategy
 
