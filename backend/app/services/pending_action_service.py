@@ -8,6 +8,7 @@ from app.repositories.pending_action_repository import PendingActionRepository
 from app.services.charge_service import ChargeService
 from app.schemas.charge import ChargeCreate
 from app.core.logging import logger
+from app.utils.org_resolver import resolve_organization_id
 
 
 class PendingActionService:
@@ -27,6 +28,7 @@ class PendingActionService:
         organization_id: Optional[int] = None,
     ) -> PendingAction:
         """Create a pending action for charge creation."""
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         await self.action_repo.expire_old_actions(datetime.now(timezone.utc))
 
         payload = {
@@ -43,7 +45,8 @@ class PendingActionService:
             user_id=user_id,
             action_type="create_charge",
             payload=payload,
-            expires_at=expires_at
+            expires_at=expires_at,
+            organization_id=organization_id,
         )
 
         logger.info(f"Pending charge action {action.id} created for user {user_id}")

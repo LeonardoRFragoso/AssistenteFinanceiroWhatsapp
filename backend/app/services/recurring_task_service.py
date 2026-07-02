@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from app.models.recurring_task import RecurringTask, RecurringTaskLog, RecurrenceType
 from app.schemas.recurring_task import RecurringTaskCreate
 from app.core.logging import logger
+from app.utils.org_resolver import resolve_organization_id
 
 
 class RecurringTaskService:
@@ -18,6 +19,7 @@ class RecurringTaskService:
         self.db = db
 
     async def create_task(self, user_id: int, data: RecurringTaskCreate, organization_id: Optional[int] = None) -> RecurringTask:
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         next_run = self._calculate_next_run(
             data.recurrence_type,
             data.day_of_week,

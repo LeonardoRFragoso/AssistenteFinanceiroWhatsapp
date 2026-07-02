@@ -19,7 +19,7 @@ class PendingAction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     action_type = Column(String(50), nullable=False, index=True)
     payload = Column(JSON, nullable=False, default=dict)
     status = Column(Enum(PendingActionStatus, values_callable=lambda x: [e.value for e in x]), nullable=False, default=PendingActionStatus.PENDING, index=True)

@@ -24,8 +24,8 @@ def upgrade():
         sa.Column('phone', sa.String(20), nullable=True, index=True),
         sa.Column('email', sa.String(255), nullable=True),
         sa.Column('notes', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
     op.create_table(
@@ -36,8 +36,8 @@ def upgrade():
         sa.Column('tone', sa.Enum('friendly', 'neutral', 'firm', name='messagetone', values_callable=lambda x: [e.value for e in x]), nullable=False, server_default='neutral'),
         sa.Column('template_text', sa.Text(), nullable=False),
         sa.Column('active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
     op.create_table(
@@ -49,8 +49,8 @@ def upgrade():
         sa.Column('trigger_type', sa.Enum('before_due', 'on_due', 'after_due', name='triggertype', values_callable=lambda x: [e.value for e in x]), nullable=False, server_default='on_due'),
         sa.Column('template_id', sa.Integer(), sa.ForeignKey('message_templates.id', ondelete='SET NULL'), nullable=True),
         sa.Column('active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
     op.create_table(
@@ -64,7 +64,7 @@ def upgrade():
         sa.Column('message_preview', sa.Text(), nullable=True),
         sa.Column('status', sa.Enum('draft', 'pending_confirmation', 'sent', 'skipped', 'failed', name='collectionmessagestatus', values_callable=lambda x: [e.value for e in x]), nullable=False, server_default='draft'),
         sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
 

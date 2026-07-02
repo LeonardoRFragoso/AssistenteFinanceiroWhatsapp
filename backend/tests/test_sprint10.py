@@ -12,23 +12,10 @@ from app.models.user import User
 
 
 @pytest_asyncio.fixture
-async def second_user(db_session):
-    user = User(
-        name="Maria Teste",
-        email="maria@example.com",
-        hashed_password="hashed",
-        phone_number="+5511888888888"
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-    return user
-
-
-@pytest_asyncio.fixture
-async def sample_charge(db_session, sample_user):
+async def sample_charge(db_session, sample_user, sample_organization):
     charge = Charge(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         customer_name="João Silva",
         customer_phone="11999999999",
         amount=Decimal("150.00"),
@@ -48,9 +35,10 @@ async def sample_charge(db_session, sample_user):
 
 
 @pytest_asyncio.fixture
-async def paid_charge(db_session, sample_user):
+async def paid_charge(db_session, sample_user, sample_organization):
     charge = Charge(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         customer_name="João Silva",
         customer_phone="11999999999",
         amount=Decimal("200.00"),
@@ -69,9 +57,10 @@ async def paid_charge(db_session, sample_user):
 
 
 @pytest_asyncio.fixture
-async def pending_charge(db_session, sample_user):
+async def pending_charge(db_session, sample_user, sample_organization):
     charge = Charge(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         customer_name="Maria Santos",
         customer_phone="11888888888",
         amount=Decimal("300.00"),
@@ -89,9 +78,10 @@ async def pending_charge(db_session, sample_user):
 
 
 @pytest_asyncio.fixture
-async def second_user_charge(db_session, second_user):
+async def second_user_charge(db_session, second_user, second_organization):
     charge = Charge(
         user_id=second_user.id,
+        organization_id=second_organization.id,
         customer_name="Carlos Outro",
         customer_phone="11777777777",
         amount=Decimal("500.00"),
@@ -109,9 +99,10 @@ async def second_user_charge(db_session, second_user):
 
 
 @pytest_asyncio.fixture
-async def collection_log(db_session, sample_user, sample_charge):
+async def collection_log(db_session, sample_user, sample_organization, sample_charge):
     log = CollectionMessageLog(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         charge_id=sample_charge.id,
         customer_id=None,
         template_id=None,
@@ -126,9 +117,10 @@ async def collection_log(db_session, sample_user, sample_charge):
 
 
 @pytest_asyncio.fixture
-async def message_template(db_session, sample_user):
+async def message_template(db_session, sample_user, sample_organization):
     tpl = MessageTemplate(
         user_id=sample_user.id,
+        organization_id=sample_organization.id,
         name="Cobrança Amigável",
         tone=MessageTone.FRIENDLY,
         template_text="Olá {{customer_name}}, sua cobrança de R$ {{amount}} está vencida.",
@@ -238,11 +230,12 @@ class TestAging:
         assert bucket_1_7["percentage"] == 100.0
 
     @pytest.mark.asyncio
-    async def test_aging_buckets(self, db_session, sample_user):
+    async def test_aging_buckets(self, db_session, sample_user, sample_organization):
         # Create charges with different overdue periods
         for days in [3, 12, 25, 45, 70]:
             charge = Charge(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 customer_name=f"Cliente {days}",
                 amount=Decimal("100.00"),
                 provider="fake",
@@ -292,12 +285,13 @@ class TestCustomerPerformance:
         assert result[0]["suggested_action"] == "send_friendly_reminder"
 
     @pytest.mark.asyncio
-    async def test_customer_performance_suggested_actions(self, db_session, sample_user):
+    async def test_customer_performance_suggested_actions(self, db_session, sample_user, sample_organization):
         service = ChargeAnalyticsService(db_session)
 
         # Good payer (only paid charges)
         charge1 = Charge(
             user_id=sample_user.id,
+            organization_id=sample_organization.id,
             customer_name="Bom Cliente",
             amount=Decimal("100.00"),
             provider="fake",
@@ -312,6 +306,7 @@ class TestCustomerPerformance:
         for i in range(3):
             c = Charge(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 customer_name="Cliente Atrasado",
                 amount=Decimal("50.00"),
                 provider="fake",
@@ -362,11 +357,12 @@ class TestCollectionPerformance:
         assert result["charges_with_followup"] == 1
 
     @pytest.mark.asyncio
-    async def test_collection_performance_sufficient_data(self, db_session, sample_user, sample_charge):
+    async def test_collection_performance_sufficient_data(self, db_session, sample_user, sample_organization, sample_charge):
         # Create 3+ logs
         for i in range(3):
             log = CollectionMessageLog(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 charge_id=sample_charge.id,
                 customer_id=None,
                 template_id=None,

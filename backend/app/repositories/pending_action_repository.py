@@ -14,10 +14,12 @@ class PendingActionRepository:
         user_id: int,
         action_type: str,
         payload: dict,
-        expires_at: datetime
+        expires_at: datetime,
+        organization_id: Optional[int] = None,
     ) -> PendingAction:
         action = PendingAction(
             user_id=user_id,
+            organization_id=organization_id,
             action_type=action_type,
             payload=payload,
             expires_at=expires_at,

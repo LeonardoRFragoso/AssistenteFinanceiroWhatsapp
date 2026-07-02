@@ -71,6 +71,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Maria Santos",
                 customer_phone="+5511888888888",
                 amount=Decimal("350.00"),
@@ -83,6 +84,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Pedro Oliveira",
                 amount=Decimal("89.90"),
                 description="Manutenção de computador",
@@ -94,6 +96,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Ana Costa",
                 customer_phone="+5511777777777",
                 amount=Decimal("1200.00"),
@@ -106,6 +109,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Carlos Ferreira",
                 amount=Decimal("450.00"),
                 description="Aula de inglês - pacote mensal",
@@ -117,6 +121,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Beatriz Lima",
                 customer_phone="+5511666666666",
                 amount=Decimal("200.00"),
@@ -130,6 +135,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Roberto Alves",
                 amount=Decimal("75.00"),
                 description="Reparo de encanamento",
@@ -142,6 +148,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Juliana Reis",
                 customer_phone="+5511555555555",
                 amount=Decimal("600.00"),
@@ -154,6 +161,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Fernando Souza",
                 amount=Decimal("180.00"),
                 description="Instalação elétrica",
@@ -165,6 +173,7 @@ class DemoService:
             ),
             Charge(
                 user_id=user_id,
+                organization_id=organization_id,
                 customer_name="Patricia Gomes",
                 customer_phone="+5511444444444",
                 amount=Decimal("950.00"),

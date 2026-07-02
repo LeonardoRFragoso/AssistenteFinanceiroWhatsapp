@@ -13,10 +13,11 @@ from app.providers.fake_provider import FakePaymentProvider
 
 class TestFinancialQueryService:
     @pytest_asyncio.fixture
-    async def charges_for_user(self, db_session, sample_user):
+    async def charges_for_user(self, db_session, sample_user, sample_organization):
         charges = [
             Charge(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 customer_name="João Silva",
                 customer_phone="11999999999",
                 amount=Decimal("150.00"),
@@ -31,6 +32,7 @@ class TestFinancialQueryService:
             ),
             Charge(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 customer_name="Maria Santos",
                 amount=Decimal("300.00"),
                 description="Consultoria",
@@ -44,6 +46,7 @@ class TestFinancialQueryService:
             ),
             Charge(
                 user_id=sample_user.id,
+                organization_id=sample_organization.id,
                 customer_name="João Silva",
                 amount=Decimal("200.00"),
                 description="Manutenção",
@@ -191,9 +194,10 @@ class TestRecurringTaskService:
         due = await service.get_due_tasks()
         assert len(due) == 0
 
-    async def test_get_due_tasks_with_past_date(self, db_session, sample_user):
+    async def test_get_due_tasks_with_past_date(self, db_session, sample_user, sample_organization):
         task = RecurringTask(
             user_id=sample_user.id,
+            organization_id=sample_organization.id,
             title="Overdue task",
             recurrence_type=RecurrenceType.DAILY,
             next_run_at=datetime.now(timezone.utc) - timedelta(hours=2),

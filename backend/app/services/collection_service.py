@@ -12,6 +12,7 @@ from app.services.customer_service import CustomerService
 from app.services.message_template_service import MessageTemplateService
 from app.schemas.collection_rule import CollectionRuleCreate
 from app.core.logging import logger
+from app.utils.org_resolver import resolve_organization_id
 
 
 class CollectionService:
@@ -25,6 +26,7 @@ class CollectionService:
         self.db = db
 
     async def create_rule(self, user_id: int, data: CollectionRuleCreate, organization_id: Optional[int] = None) -> CollectionRule:
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         if data.template_id:
             mt_service = MessageTemplateService(self.db)
             template = await mt_service.get_template(data.template_id, user_id, organization_id)
@@ -174,6 +176,7 @@ class CollectionService:
         organization_id: Optional[int] = None,
     ) -> CollectionMessageLog:
         """Create a log entry for a collection message."""
+        organization_id = await resolve_organization_id(self.db, user_id, organization_id)
         log = CollectionMessageLog(
             user_id=user_id,
             organization_id=organization_id,

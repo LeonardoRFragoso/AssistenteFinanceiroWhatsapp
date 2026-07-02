@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, extract
+from sqlalchemy import select, func, and_, extract, text
 from datetime import datetime, timedelta, date
 from decimal import Decimal
+from typing import List
 from app.core.database import get_db
 from app.schemas.metrics import MetricsResponse
 from app.schemas.analytics import (
@@ -31,6 +32,16 @@ import time as time_module
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 _start_time = time_module.time()
+
+ORG_SCOPED_TABLES = [
+    "charges",
+    "customers",
+    "message_templates",
+    "collection_rules",
+    "collection_message_logs",
+    "recurring_tasks",
+    "pending_actions",
+]
 
 
 @router.get("/metrics", response_model=MetricsResponse)
@@ -428,4 +439,42 @@ async def get_system_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving system metrics"
+        )
+
+
+@router.get("/multitenant-health")
+async def get_multitenant_health(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Check multi-tenant integrity: detect orphan records without organization_id."""
+    try:
+        orphan_records = 0
+        null_organization_records = 0
+
+        for table in ORG_SCOPED_TABLES:
+            null_count = (await db.execute(text(
+                f"SELECT COUNT(*) FROM {table} WHERE organization_id IS NULL"
+            ))).scalar()
+            invalid_count = (await db.execute(text(
+                f"SELECT COUNT(*) FROM {table} t "
+                f"WHERE t.organization_id IS NOT NULL "
+                f"AND NOT EXISTS (SELECT 1 FROM organizations o WHERE o.id = t.organization_id)"
+            ))).scalar()
+
+            null_organization_records += null_count
+            orphan_records += null_count + invalid_count
+
+        return {
+            "status": "ok" if orphan_records == 0 else "warning",
+            "tables_checked": len(ORG_SCOPED_TABLES),
+            "orphan_records": orphan_records,
+            "null_organization_records": null_organization_records,
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking multi-tenant health: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error checking multi-tenant health"
         )

@@ -27,15 +27,15 @@ def upgrade():
         sa.Column('day_of_month', sa.Integer(), nullable=True),
         sa.Column('next_run_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
     )
 
     op.create_table(
         'recurring_task_logs',
         sa.Column('id', sa.Integer(), primary_key=True, index=True),
         sa.Column('task_id', sa.Integer(), sa.ForeignKey('recurring_tasks.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('executed_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('executed_at', sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
         sa.Column('success', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('message_sent', sa.Text(), nullable=True),
         sa.Column('error', sa.Text(), nullable=True),

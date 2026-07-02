@@ -1,5 +1,14 @@
 # Security Hardening — PayFlow AI
 
+## NOT NULL Enforcement & Migration Portability (Sprint 11.2)
+
+- **`organization_id` is NOT NULL**: All 7 org-scoped tables (charges, customers, message_templates, collection_rules, collection_message_logs, recurring_tasks, pending_actions) now enforce `organization_id` as `NOT NULL` at the database level.
+- **Migration `i9d0e1f2g3h4`**: Deletes any remaining NULL records (safety net after backfill), then alters column to `NOT NULL` using `batch_alter_table` for SQLite compatibility.
+- **Auto-resolution**: Services auto-resolve `organization_id` from user's default organization when not explicitly provided. This prevents accidental NULL inserts from code paths that don't pass `organization_id`.
+- **Migration portability**: All Alembic migrations now work on both SQLite and PostgreSQL. No PostgreSQL-specific syntax outside dialect guards.
+- **Audit script**: `scripts/audit_multitenant_integrity.py` detects orphan records (NULL or invalid `organization_id`). Exit code 1 if inconsistencies found.
+- **Admin health endpoint**: `GET /admin/multitenant-health` exposes orphan record counts. Protected by admin authentication.
+
 ## Multi-Tenant Isolation Hardening (Sprint 11.1)
 
 - **Organization_id as primary data boundary**: All org-scoped routers now inject `get_current_organization` and pass `org.id` to every service call. Services filter all queries by `organization_id` in addition to `user_id`.

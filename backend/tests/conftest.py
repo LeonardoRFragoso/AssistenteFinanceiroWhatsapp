@@ -48,6 +48,20 @@ async def sample_user(db_session):
 
 
 @pytest_asyncio.fixture
+async def second_user(db_session):
+    user = User(
+        name="Maria Teste",
+        email="maria@example.com",
+        hashed_password="hashed",
+        phone_number="+5511888888888"
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def sample_organization(db_session, sample_user):
     """Create a default organization for the sample user."""
     org = Organization(
@@ -60,6 +74,30 @@ async def sample_organization(db_session, sample_user):
     member = OrganizationMember(
         organization_id=org.id,
         user_id=sample_user.id,
+        role=OrganizationRole.OWNER,
+        active=True,
+        joined_at=datetime.now(timezone.utc),
+    )
+    db_session.add(member)
+    await db_session.commit()
+    await db_session.refresh(org)
+    return org
+
+
+@pytest_asyncio.fixture
+async def second_organization(db_session, second_user):
+    """Create a default organization for the second user."""
+    from app.models.organization import Organization, OrganizationMember, OrganizationRole
+    org = Organization(
+        name="Second Test Org",
+        slug=f"second-test-org-{second_user.id}",
+        owner_user_id=second_user.id,
+    )
+    db_session.add(org)
+    await db_session.flush()
+    member = OrganizationMember(
+        organization_id=org.id,
+        user_id=second_user.id,
         role=OrganizationRole.OWNER,
         active=True,
         joined_at=datetime.now(timezone.utc),
