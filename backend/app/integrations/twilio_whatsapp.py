@@ -7,8 +7,10 @@ from app.core.logging import logger
 
 class TwilioWhatsAppService:
     def __init__(self):
-        self.client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        self.validator = RequestValidator(settings.TWILIO_AUTH_TOKEN)
+        auth_token = settings.TWILIO_AUTH_TOKEN or "dummy-token-for-init"
+        account_sid = settings.TWILIO_ACCOUNT_SID or "dummy-sid"
+        self.client = Client(account_sid, auth_token)
+        self.validator = RequestValidator(auth_token)
         self.whatsapp_number = settings.TWILIO_WHATSAPP_NUMBER
     
     def validate_request(self, url: str, params: dict, signature: str) -> bool:

@@ -17,6 +17,10 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o"
+
+    # Document analysis provider: "mock" or "openai"
+    # Defaults to "mock" in testing/demo, "openai" when explicitly configured
+    DOCUMENT_ANALYSIS_PROVIDER: str = "mock"
     
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None

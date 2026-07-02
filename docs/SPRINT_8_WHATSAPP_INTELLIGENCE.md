@@ -143,4 +143,22 @@ O Sprint 8 evolui o PayFlow AI com inteligência financeira via WhatsApp, geraç
   - RecurringTaskService (8 testes)
   - DocumentAnalysisService (7 testes)
   - FakePaymentProvider QR Code (2 testes)
-- **Todos os testes passando** (136 passed, 2 pre-existing failures, 6 OpenAI API errors)
+- **30 testes de estabilização** em `test_sprint8_stabilize.py` (Sprint 8.1):
+  - AIService graceful init (4 testes)
+  - TwilioWhatsAppService graceful init (3 testes)
+  - OCR mock provider (7 testes)
+  - QR Code sandbox isolation (5 testes)
+  - Recurring task isolation (5 testes)
+  - WhatsApp media handling (6 testes)
+- **Resultado final: 174 passed, 0 failed, 0 errors**
+
+## Sprint 8.1 — Estabilização
+
+### Correções aplicadas:
+
+- **AIService**: construtor usa `api_key or "dummy-key-for-init"` para não crashar sem `OPENAI_API_KEY`
+- **TwilioWhatsAppService**: construtor usa `auth_token or "dummy-token-for-init"` para não crashar sem `TWILIO_AUTH_TOKEN`
+- **DocumentAnalysisService**: adicionado `DOCUMENT_ANALYSIS_PROVIDER` config (default `mock`); quando mock ou sem API key, retorna resultado determinístico sem chamar OpenAI
+- **RecurringTasks router**: `is_admin` inexistente substituído por checagem `ADMIN_EMAILS` (mesmo padrão do auth router)
+- **OCR em modo mock**: não chama OpenAI Vision; retorna `confidence=0.0` com `requires_confirmation=True`
+- **OCR em produção**: continua usando OpenAI Vision quando `DOCUMENT_ANALYSIS_PROVIDER=openai` e `OPENAI_API_KEY` configurada

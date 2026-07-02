@@ -100,14 +100,34 @@ class DocumentAnalysisService:
             }
 
     async def _analyze_image(self, content: bytes, content_type: str) -> Dict[str, Any]:
-        """Analyze an image using OpenAI Vision API."""
+        """Analyze an image using OpenAI Vision API or mock fallback.
+
+        When DOCUMENT_ANALYSIS_PROVIDER is "mock" or OPENAI_API_KEY is not set,
+        returns a deterministic mock result instead of calling OpenAI.
+        """
+        provider = getattr(settings, "DOCUMENT_ANALYSIS_PROVIDER", "mock")
+        api_key = settings.OPENAI_API_KEY
+
+        if provider == "mock" or not api_key:
+            logger.info("Document analysis using mock provider (no OpenAI API key or mock mode)")
+            return {
+                "document_type": "unknown",
+                "amount": None,
+                "due_date": None,
+                "description": "Mock mode: image received but not analyzed with AI",
+                "recipient_name": None,
+                "confidence": 0.0,
+                "suggested_action": "manual_review",
+                "requires_confirmation": True,
+            }
+
         import base64
         from openai import AsyncOpenAI
 
         b64 = base64.b64encode(content).decode("utf-8")
         media_type = content_type  # e.g. "image/png"
 
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, timeout=30.0)
+        client = AsyncOpenAI(api_key=api_key, timeout=30.0)
 
         prompt = """Analise esta imagem e extraia dados financeiros se houver.
 

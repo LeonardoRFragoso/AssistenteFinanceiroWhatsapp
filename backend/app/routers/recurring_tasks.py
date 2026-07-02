@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.core.database import get_db
+from app.core.config import settings
 from app.utils.dependencies import get_current_active_user
 from app.services.recurring_task_service import RecurringTaskService
 from app.schemas.recurring_task import (
@@ -68,7 +69,8 @@ async def run_due_recurring_tasks(
     This endpoint is protected and intended for admin/dev use.
     It only sends reminders — NEVER executes payments.
     """
-    if not current_user.is_admin:
+    admin_emails = [e.strip() for e in settings.ADMIN_EMAILS.split(",") if e.strip()]
+    if current_user.email not in admin_emails:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can trigger recurring task execution"

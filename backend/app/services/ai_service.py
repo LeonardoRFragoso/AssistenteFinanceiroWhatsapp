@@ -9,8 +9,9 @@ from app.core.logging import logger
 
 class AIService:
     def __init__(self):
+        api_key = settings.OPENAI_API_KEY or "dummy-key-for-init"
         self.client = AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY,
+            api_key=api_key,
             timeout=30.0  # 30 segundos
         )
         self.model = settings.OPENAI_MODEL
