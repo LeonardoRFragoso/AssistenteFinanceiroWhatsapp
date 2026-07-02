@@ -100,3 +100,14 @@ Global IP-based rate limiting middleware: 100 requests/minute per IP.
 - [ ] `SECRET_KEY` is a strong random value (64+ chars)
 - [ ] No secrets in `.env` committed to git
 - [ ] Redis available for rate limiting (or accept in-memory fallback)
+
+## OCR Assistive Security (Sprint 8/8.1)
+
+- **OCR é apenas assistivo**: extrai dados de imagens/PDFs, NUNCA executa pagamentos ou Pix
+- **Não paga boleto**: OCR apenas sugere criação de lembrete, requer confirmação explícita
+- **Não cria transação automaticamente**: toda ação sugerida tem `requires_confirmation=true`
+- **Provider configurável**: `DOCUMENT_ANALYSIS_PROVIDER` (default `mock`) — em test/demo usa mock determinístico
+- **OpenAI Vision é opcional**: só ativado quando `DOCUMENT_ANALYSIS_PROVIDER=openai` e `OPENAI_API_KEY` configurada
+- **Dados sensíveis não são logados**: logs contêm apenas metadados (tipo, tamanho, confiança), nunca conteúdo do documento
+- **Limite de arquivo**: 5MB máximo, tipos aceitos: PNG, JPG, WebP, PDF
+- **Arquivo não é salvo permanentemente**: processado em memória e descartado

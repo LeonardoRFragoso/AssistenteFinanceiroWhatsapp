@@ -114,3 +114,13 @@
 - **Tarefas recorrentes** — model `RecurringTask` + `RecurringTaskLog`, service, endpoints, worker job, componente frontend
 - **27 novos testes** — FinancialQueryService (10), RecurringTaskService (8), DocumentAnalysisService (7), QR Code (2)
 - **Documentação** — `SPRINT_8_WHATSAPP_INTELLIGENCE.md`
+
+## Sprint 8.1: Stabilize OCR, Twilio Media, Test Suite e Documentation Counts
+
+- **OpenAI graceful init** — `AIService` e `DocumentAnalysisService` não crasham quando `OPENAI_API_KEY` está ausente; usam dummy key ou mock fallback
+- **Twilio graceful init** — `TwilioWhatsAppService` não crasha quando `TWILIO_AUTH_TOKEN` está ausente; usa dummy token (validação de assinatura continua segura)
+- **OCR mock provider** — nova config `DOCUMENT_ANALYSIS_PROVIDER` (default `mock`); imagem analysis retorna mock determinístico sem chamar OpenAI em test/demo
+- **Recurring tasks admin fix** — `is_admin` inexistente substituído por checagem `ADMIN_EMAILS` (mesmo padrão do auth router)
+- **30 novos testes de estabilização** — AIService init (4), Twilio init (3), OCR mock (7), QR Code sandbox (5), Recurring task isolation (5), WhatsApp media handling (6)
+- **Resultado final: 174 passed, 0 failed, 0 errors**
+- **Documentação** — contagens corrigidas em README, RELEASE_NOTES, SPRINT_8
