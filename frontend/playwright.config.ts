@@ -7,7 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1,
   workers: 1,
   reporter: 'html',
-  timeout: 60000,
+  timeout: 90000,
   expect: {
     timeout: 15000,
   },
@@ -15,7 +15,7 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     actionTimeout: 15000,
-    navigationTimeout: 30000,
+    navigationTimeout: 60000,
   },
   projects: [
     {

@@ -857,6 +857,7 @@ export default function Dashboard() {
       {/* QR Code Modal (sandbox) */}
       {qrModalCharge && (
         <div
+          data-testid="qr-code-modal"
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setQrModalCharge(null)}
         >
