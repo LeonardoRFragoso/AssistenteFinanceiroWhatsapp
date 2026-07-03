@@ -521,3 +521,84 @@ async def get_multitenant_health(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error checking multi-tenant health"
         )
+
+
+@router.get("/billing-metrics")
+async def get_billing_metrics(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Get aggregated SaaS billing metrics: subs by status, orgs by plan, usage totals."""
+    try:
+        from app.models.billing import (
+            OrganizationSubscription, SubscriptionPlan, UsageCounter, SubscriptionStatus
+        )
+
+        # Subscriptions by status
+        status_counts = {}
+        for s in SubscriptionStatus:
+            count = (await db.execute(
+                select(func.count(OrganizationSubscription.id)).where(
+                    OrganizationSubscription.status == s
+                )
+            )).scalar()
+            status_counts[s.value] = count
+
+        # Organizations by plan
+        plan_counts = await db.execute(
+            select(
+                SubscriptionPlan.code,
+                SubscriptionPlan.name,
+                func.count(OrganizationSubscription.id)
+            ).join(
+                OrganizationSubscription, OrganizationSubscription.plan_id == SubscriptionPlan.id
+            ).group_by(SubscriptionPlan.code, SubscriptionPlan.name)
+        )
+        orgs_by_plan = [
+            {"plan_code": row[0], "plan_name": row[1], "count": row[2]}
+            for row in plan_counts
+        ]
+
+        # Total usage across all orgs (current period)
+        usage_totals = await db.execute(
+            select(
+                func.coalesce(func.sum(UsageCounter.charges_created), 0).label("total_charges"),
+                func.coalesce(func.sum(UsageCounter.customers_created), 0).label("total_customers"),
+                func.coalesce(func.sum(UsageCounter.templates_created), 0).label("total_templates"),
+                func.coalesce(func.sum(UsageCounter.recurring_tasks_created), 0).label("total_recurring_tasks"),
+                func.coalesce(func.sum(UsageCounter.ocr_documents_analyzed), 0).label("total_ocr"),
+                func.coalesce(func.sum(UsageCounter.pdf_exports_generated), 0).label("total_pdf_exports"),
+                func.coalesce(func.sum(UsageCounter.whatsapp_messages_processed), 0).label("total_whatsapp_messages"),
+                func.coalesce(func.sum(UsageCounter.collection_followups_generated), 0).label("total_followups"),
+            )
+        )
+        row = usage_totals.one()
+        usage = {
+            "total_charges": row.total_charges,
+            "total_customers": row.total_customers,
+            "total_templates": row.total_templates,
+            "total_recurring_tasks": row.total_recurring_tasks,
+            "total_ocr_documents": row.total_ocr,
+            "total_pdf_exports": row.total_pdf_exports,
+            "total_whatsapp_messages": row.total_whatsapp_messages,
+            "total_collection_followups": row.total_followups,
+        }
+
+        # Total billing events
+        total_events = (await db.execute(
+            select(func.count(text("1"))).select_from(text("billing_events"))
+        )).scalar()
+
+        return {
+            "subscriptions_by_status": status_counts,
+            "organizations_by_plan": orgs_by_plan,
+            "usage_totals": usage,
+            "total_billing_events": total_events,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting billing metrics: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error getting billing metrics"
+        )

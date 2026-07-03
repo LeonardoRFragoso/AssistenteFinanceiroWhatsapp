@@ -35,6 +35,7 @@ async def list_plans(
             "max_team_members": p.max_team_members,
             "max_message_templates": p.max_message_templates,
             "max_recurring_tasks": p.max_recurring_tasks,
+            "max_whatsapp_messages_per_month": p.max_whatsapp_messages_per_month,
             "allow_advanced_analytics": p.allow_advanced_analytics,
             "allow_pdf_export": p.allow_pdf_export,
             "allow_ocr": p.allow_ocr,

@@ -124,11 +124,12 @@ async def whatsapp_webhook(
                             await twilio_service.send_message(
                                 From,
                                 f"⚠️ A análise de documentos (OCR) não está disponível no plano "
-                                f"{ocr_ent.get('plan', 'atual')}. Faça upgrade para o plano Professional "
-                                f"ou superior para usar este recurso."
+                                f"{ocr_ent.get('plan_name', ocr_ent.get('plan', 'atual'))}. "
+                                f"Recurso: análise de documentos\n\n"
+                                f"Acesse o dashboard para alterar seu plano.\n"
+                                f"Nenhuma ação foi executada."
                             )
                             return {"status": "success", "message": "OCR not included in plan"}
-                        await billing.increment_usage(org.id, "ocr_documents_analyzed")
                 except Exception as e:
                     logger.warning(f"OCR billing check failed: {e}")
 
@@ -139,6 +140,13 @@ async def whatsapp_webhook(
                     analysis = await doc_service.analyze_media_url(MediaUrl0, content_type)
                     response = doc_service.format_whatsapp_response(analysis)
                     await twilio_service.send_message(From, response)
+                    # SaaS billing: increment OCR usage after successful analysis
+                    try:
+                        if org and org.id:
+                            billing = SaaSBillingService(db)
+                            await billing.increment_usage(org.id, "ocr_documents_analyzed")
+                    except Exception as e:
+                        logger.warning(f"Failed to increment OCR usage: {e}")
                     return {"status": "success", "message": "Document analyzed"}
                 except Exception as e:
                     logger.error(f"Error analyzing document: {str(e)}")
@@ -218,7 +226,6 @@ async def whatsapp_webhook(
                 )
                 await twilio_service.send_message(From, limit_msg)
                 return {"status": "success", "message": "WhatsApp message limit reached"}
-            await billing.increment_usage(org.id, "whatsapp_messages_processed")
         except Exception as e:
             logger.warning(f"Billing check failed for WhatsApp: {e}")
         
@@ -233,7 +240,15 @@ async def whatsapp_webhook(
             )
         except Exception as e:
             logger.warning(f"Failed to save user message to conversation log: {str(e)}")
-        
+
+        # SaaS billing: increment WhatsApp message usage after message is accepted for processing
+        try:
+            if org and org.id:
+                billing = SaaSBillingService(db)
+                await billing.increment_usage(org.id, "whatsapp_messages_processed")
+        except Exception as e:
+            logger.warning(f"Failed to increment WhatsApp usage: {e}")
+
         context = await conversation_repo.get_context(user.id, limit=5)
 
         classification = await ai_service.classify_intent(message_text, context)
@@ -687,9 +702,11 @@ async def handle_create_pix_charge(
                 if not charge_ent["allowed"]:
                     return (
                         f"⚠️ Você atingiu o limite de cobranças do plano "
-                        f"{charge_ent.get('plan', 'atual')}. "
-                        f"Limite: {charge_ent.get('limit', 'N/A')}. "
-                        f"Faça upgrade do seu plano para criar mais cobranças."
+                        f"{charge_ent.get('plan_name', charge_ent.get('plan', 'atual'))}.\n"
+                        f"Limite: {charge_ent.get('limit', 'N/A')} cobranças/mês\n"
+                        f"Uso atual: {charge_ent.get('current_usage', 'N/A')}\n\n"
+                        f"Acesse o dashboard para alterar seu plano.\n"
+                        f"Nenhuma cobrança foi criada."
                     )
             except Exception as e:
                 logger.warning(f"Billing check failed for charge creation: {e}")

@@ -171,7 +171,8 @@ POST /saas-billing/subscription/change-plan
     │
     ├── RBAC: owner/admin only
     ├── SaaSBillingService.change_plan(org_id, plan_code)
-    ├── BillingEvent recorded
+    ├── Downgrade protection: check if usage exceeds target plan limits
+    ├── BillingEvent recorded (idempotent via provider_event_id)
     └── New plan active immediately (sandbox)
 ```
 
@@ -183,24 +184,27 @@ Incoming WhatsApp message
     ▼
 EntitlementsService.can_process_whatsapp_message(org_id)
     │
-    ├── If limit reached → send limit message, return
-    ├── Increment whatsapp_messages_processed
+    ├── If limit reached → send limit message (PT-BR), return
     │
     ▼
+Message accepted → conversation log created
+    │
+    └── Increment whatsapp_messages_processed (post-success)
+
 If document/image attached:
     │
     ├── EntitlementsService.can_use_ocr(org_id)
-    ├── If not included → send upgrade message, return
-    ├── Increment ocr_documents_analyzed
-    │
-    ▼
+    ├── If not included → send upgrade message (PT-BR), return
+    ├── Document analyzed successfully
+    └── Increment ocr_documents_analyzed (post-success)
+
 If charge creation intent:
     │
     ├── EntitlementsService.can_create_charge(org_id)
-    ├── If limit reached → send limit message, return
+    ├── If limit reached → send limit message (PT-BR), return (no pending action created)
     │
     ▼
-Charge confirmed → increment charges_created
+Charge confirmed → increment charges_created (post-success)
 ```
 
 ## Data Models

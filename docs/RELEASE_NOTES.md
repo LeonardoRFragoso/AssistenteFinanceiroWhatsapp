@@ -1,5 +1,20 @@
 # PayFlow AI — Release Notes
 
+## Sprint 12.1: Billing Hardening
+
+- **Seed idempotency**: `seed_plans()` now updates existing plans with latest definitions instead of skipping. No duplicates on repeated calls.
+- **Downgrade protection**: `change_plan()` blocks downgrades when current usage exceeds target plan limits. Returns clear error with exceeded resource details.
+- **Entitlements payload**: All entitlement responses now include `feature` and `plan_name` fields. Feature-flag denials separated from usage-limit denials.
+- **Usage integrity**: WhatsApp message and OCR usage increments moved to post-success (after conversation log / after document analysis). No increments on blocked or failed operations.
+- **WhatsApp billing messages**: Improved PT-BR messages with plan name, limit, current usage, and clear "no action executed" statements.
+- **Provider factory hardening**: Production rejects unknown providers with `ValueError`. Demo mode forces fake provider. Dev/testing falls back to fake with warning.
+- **BillingEvent idempotency**: `provider_event_id` deduplication prevents duplicate events on repeated webhooks. Payload sanitization redacts secret/token/key fields.
+- **List plans endpoint**: Now includes `max_whatsapp_messages_per_month` in response.
+- **Frontend hardening**: `BillingSection` with `data-testid` attributes, role-based button visibility (owner/admin only), error state with retry, loading state.
+- **Admin billing metrics**: New `GET /admin/billing-metrics` endpoint with subs by status, orgs by plan, usage totals, total billing events.
+- **E2E tests**: 7 Playwright billing tests covering section visibility, plan cards, usage meters, change plan flow.
+- **Backend tests**: 32 new tests (64 billing tests total). 353 backend tests pass. Frontend build passes. No regressions.
+
 ## Sprint 12: SaaS Billing, Plans, Usage Limits & Subscription Sandbox
 
 - **SaaS billing layer**: Subscription plans (Free, Starter, Professional, Business), usage counters, billing events, and a sandboxed subscription management system.

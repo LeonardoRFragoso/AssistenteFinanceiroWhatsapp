@@ -9,8 +9,18 @@ def get_billing_provider(provider_name: str | None = None) -> BaseBillingProvide
 
     This is SEPARATE from get_payment_provider which handles charges.
     Default is 'fake' (no real payments).
+
+    In production, an unknown provider raises ValueError.
+    In development/testing/demo, an unknown provider falls back to fake with a warning.
     """
     name = provider_name or settings.PAYFLOW_BILLING_PROVIDER
+    env = settings.ENVIRONMENT.lower()
+
+    # Demo mode always forces fake
+    if getattr(settings, "ENABLE_DEMO_MODE", False):
+        if name != "fake":
+            logger.warning(f"Demo mode active: forcing fake billing provider (requested: {name})")
+        return FakeBillingProvider()
 
     if name == "fake":
         return FakeBillingProvider()
@@ -21,5 +31,10 @@ def get_billing_provider(provider_name: str | None = None) -> BaseBillingProvide
         logger.warning("Mercado Pago sandbox billing provider not fully implemented, falling back to fake")
         return FakeBillingProvider()
     else:
-        logger.warning(f"Unknown billing provider '{name}', falling back to fake")
+        if env == "production":
+            raise ValueError(
+                f"Unknown billing provider '{name}' in production environment. "
+                f"Set PAYFLOW_BILLING_PROVIDER to a supported value (fake, stripe_sandbox, mercado_pago_sandbox)."
+            )
+        logger.warning(f"Unknown billing provider '{name}' in {env} environment, falling back to fake")
         return FakeBillingProvider()

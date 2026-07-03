@@ -1,5 +1,16 @@
 # Security Hardening — PayFlow AI
 
+## SaaS Billing Hardening (Sprint 12.1)
+
+- **Seed idempotency**: `seed_plans()` updates existing plans with latest definitions. No duplicates, always in sync with code.
+- **Downgrade protection**: Plan downgrades are blocked when current usage exceeds target plan limits. Prevents data loss and inconsistent state.
+- **Entitlement payload completeness**: All entitlement responses include `feature`, `plan`, `plan_name`. Feature-flag denials clearly separated from usage-limit denials.
+- **Usage counter integrity**: WhatsApp message and OCR usage increments occur only after successful operations. No increments on blocked, failed, or rejected operations.
+- **Provider factory hardening**: Production environment rejects unknown billing providers with `ValueError`. Demo mode forces fake provider. Prevents misconfiguration in production.
+- **BillingEvent idempotency**: `provider_event_id` deduplication prevents duplicate events on repeated webhooks. Payload sanitization redacts `secret`, `token`, `key`, `password`, `api_key` fields from stored events.
+- **Frontend RBAC enforcement**: BillingSection hides management buttons (change plan, checkout, cancel, reactivate) for non-owner/admin roles. Viewers and finance can see data but not modify.
+- **Admin billing metrics**: New `GET /admin/billing-metrics` endpoint with aggregated subs by status, orgs by plan, usage totals. Protected by admin authentication.
+
 ## SaaS Billing Security (Sprint 12)
 
 - **No real payments**: Fake billing provider is the default. No Stripe, Mercado Pago, or real payment processor is called for SaaS subscriptions. `PAYFLOW_BILLING_PROVIDER=fake` by default.
