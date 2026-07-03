@@ -97,17 +97,22 @@ class SaaSBillingService:
         self.provider = get_billing_provider()
 
     async def seed_plans(self) -> None:
-        """Seed default subscription plans if they don't exist."""
+        """Seed default subscription plans. Idempotent: updates existing plans with latest definitions."""
         for plan_def in PLAN_DEFINITIONS:
-            existing = await self.db.execute(
+            result = await self.db.execute(
                 select(SubscriptionPlan).where(SubscriptionPlan.code == plan_def["code"])
             )
-            if existing.scalar_one_or_none():
-                continue
-            plan = SubscriptionPlan(**plan_def, active=True)
-            self.db.add(plan)
+            existing = result.scalar_one_or_none()
+            if existing:
+                # Update existing plan with latest definition values
+                for key, value in plan_def.items():
+                    setattr(existing, key, value)
+                existing.active = True
+            else:
+                plan = SubscriptionPlan(**plan_def, active=True)
+                self.db.add(plan)
         await self.db.commit()
-        logger.info("Subscription plans seeded")
+        logger.info("Subscription plans seeded (idempotent)")
 
     async def list_plans(self, active_only: bool = True) -> List[SubscriptionPlan]:
         query = select(SubscriptionPlan)
@@ -225,7 +230,11 @@ class SaaSBillingService:
     async def change_plan(
         self, organization_id: int, new_plan_code: str
     ) -> OrganizationSubscription:
-        """Change the plan of an existing subscription."""
+        """Change the plan of an existing subscription.
+
+        Downgrade protection: if current usage exceeds the target plan's limits,
+        the change is blocked with a clear error.
+        """
         sub = await self.get_subscription(organization_id)
         if not sub:
             raise ValueError("No subscription found for organization")
@@ -233,6 +242,14 @@ class SaaSBillingService:
         new_plan = await self.get_plan_by_code(new_plan_code)
         if not new_plan:
             raise ValueError(f"Plan '{new_plan_code}' not found")
+
+        old_plan = await self.get_plan_by_id(sub.plan_id)
+
+        # Downgrade protection: check if current usage exceeds target plan limits
+        if old_plan and new_plan:
+            downgrade_check = await self._check_downgrade_safety(organization_id, old_plan, new_plan)
+            if not downgrade_check["allowed"]:
+                raise ValueError(downgrade_check["reason"] + " | details: " + str(downgrade_check["details"]))
 
         old_plan_id = sub.plan_id
 
@@ -425,15 +442,83 @@ class SaaSBillingService:
         event_type: str,
         provider: str,
         payload: Optional[Dict[str, Any]] = None,
+        provider_event_id: Optional[str] = None,
     ) -> None:
+        # Idempotency: if provider_event_id is provided, check for duplicate
+        if provider_event_id:
+            existing = await self.db.execute(
+                select(BillingEvent).where(
+                    and_(
+                        BillingEvent.organization_id == organization_id,
+                        BillingEvent.provider_event_id == provider_event_id,
+                    )
+                )
+            )
+            if existing.scalar_one_or_none():
+                logger.info(f"Duplicate billing event skipped: {provider_event_id}")
+                return
+
+        # Sanitize payload: remove any potential secret fields
+        safe_payload = self._sanitize_payload(payload or {})
+
         event = BillingEvent(
             organization_id=organization_id,
             subscription_id=subscription_id,
             event_type=event_type,
             provider=provider,
-            payload=payload or {},
+            provider_event_id=provider_event_id,
+            payload=safe_payload,
         )
         self.db.add(event)
+
+    def _sanitize_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove sensitive fields from payload before storing."""
+        sensitive_keys = {"secret", "token", "key", "password", "api_key", "secret_key"}
+        safe = {}
+        for k, v in payload.items():
+            if any(s in k.lower() for s in sensitive_keys):
+                safe[k] = "[REDACTED]"
+            elif isinstance(v, dict):
+                safe[k] = self._sanitize_payload(v)
+            else:
+                safe[k] = v
+        return safe
+
+    async def _check_downgrade_safety(
+        self, organization_id: int, old_plan: SubscriptionPlan, new_plan: SubscriptionPlan
+    ) -> Dict[str, Any]:
+        """Check if current usage exceeds target plan limits for downgrade."""
+        usage = await self.get_usage(organization_id)
+        if not usage:
+            return {"allowed": True}
+
+        # Only check for downgrade (price decrease or fewer limits)
+        if new_plan.price_monthly >= old_plan.price_monthly:
+            return {"allowed": True}
+
+        checks = [
+            ("charges_created", usage.charges_created, new_plan.max_charges_per_month),
+            ("customers_created", usage.customers_created, new_plan.max_customers),
+            ("templates_created", usage.templates_created, new_plan.max_message_templates),
+            ("recurring_tasks_created", usage.recurring_tasks_created, new_plan.max_recurring_tasks),
+        ]
+
+        exceeded = []
+        for resource, current, limit in checks:
+            if current > limit:
+                exceeded.append({
+                    "resource": resource,
+                    "current_usage": current,
+                    "target_limit": limit,
+                })
+
+        if exceeded:
+            return {
+                "allowed": False,
+                "reason": "current_usage_exceeds_target_plan",
+                "details": exceeded,
+            }
+        return {"allowed": True}
 
     async def get_billing_events(
         self, organization_id: int, limit: int = 50

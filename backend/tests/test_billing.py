@@ -500,3 +500,469 @@ class TestSubscriptionSummary:
         assert summary["plan"]["code"] == "professional"
         assert summary["usage"]["charges_created"] == 5
         assert summary["entitlements"]["allow_ocr"] is True
+
+
+# ============================================================
+# Sprint 12.1 — Billing Hardening Tests
+# ============================================================
+
+class TestSeedIdempotency:
+    @pytest.mark.asyncio
+    async def test_seed_twice_no_duplicate(self, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.seed_plans()
+        plans = await service.list_plans(active_only=False)
+        codes = [p.code for p in plans]
+        assert len(codes) == 4
+        assert len(set(codes)) == 4
+
+    @pytest.mark.asyncio
+    async def test_seed_updates_existing_plan(self, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        free = await service.get_plan_by_code("free")
+        original_limit = free.max_charges_per_month
+        # Modify the plan in DB
+        free.max_charges_per_month = 999
+        await test_session.commit()
+        # Re-seed should update it back
+        await service.seed_plans()
+        await test_session.refresh(free)
+        assert free.max_charges_per_month == original_limit
+
+    @pytest.mark.asyncio
+    async def test_business_plan_limits(self, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        biz = await service.get_plan_by_code("business")
+        assert biz.max_charges_per_month == 5000
+        assert biz.max_customers == 5000
+        assert biz.max_team_members == 20
+        assert biz.max_whatsapp_messages_per_month is None
+        assert biz.allow_ocr is True
+        assert biz.allow_pdf_export is True
+        assert biz.allow_advanced_analytics is True
+
+
+class TestDowngradeProtection:
+    @pytest.mark.asyncio
+    async def test_upgrade_allowed(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        sub = await service.change_plan(authed_org.id, "professional")
+        assert sub.status == SubscriptionStatus.ACTIVE
+        plan = await service.get_current_plan(authed_org.id)
+        assert plan.code == "professional"
+
+    @pytest.mark.asyncio
+    async def test_downgrade_within_limit_allowed(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.change_plan(authed_org.id, "professional")
+        # No usage, so downgrade should be fine
+        sub = await service.change_plan(authed_org.id, "starter")
+        plan = await service.get_current_plan(authed_org.id)
+        assert plan.code == "starter"
+
+    @pytest.mark.asyncio
+    async def test_downgrade_blocked_when_usage_exceeds(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.change_plan(authed_org.id, "professional")
+        # Exceed starter limits (100 charges)
+        await service.increment_usage(authed_org.id, "charges_created", 150)
+        with pytest.raises(ValueError, match="current_usage_exceeds_target_plan"):
+            await service.change_plan(authed_org.id, "starter")
+
+    @pytest.mark.asyncio
+    async def test_downgrade_to_free_blocked_when_usage_exceeds(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.change_plan(authed_org.id, "professional")
+        # Exceed free limits (20 charges)
+        await service.increment_usage(authed_org.id, "charges_created", 25)
+        with pytest.raises(ValueError, match="current_usage_exceeds_target_plan"):
+            await service.change_plan(authed_org.id, "free")
+
+    @pytest.mark.asyncio
+    async def test_change_plan_records_event(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.change_plan(authed_org.id, "starter")
+        events = await service.get_billing_events(authed_org.id)
+        event_types = [e.event_type for e in events]
+        assert "plan_changed" in event_types
+
+    @pytest.mark.asyncio
+    async def test_cancel_records_event(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.change_plan(authed_org.id, "professional")
+        await service.cancel_subscription(authed_org.id)
+        events = await service.get_billing_events(authed_org.id)
+        event_types = [e.event_type for e in events]
+        assert "subscription_cancelled" in event_types
+
+    @pytest.mark.asyncio
+    async def test_reactivate_records_event(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.change_plan(authed_org.id, "professional")
+        await service.cancel_subscription(authed_org.id)
+        await service.reactivate_subscription(authed_org.id)
+        events = await service.get_billing_events(authed_org.id)
+        event_types = [e.event_type for e in events]
+        assert "subscription_reactivated" in event_types
+
+
+class TestEntitlementPayload:
+    @pytest.mark.asyncio
+    async def test_charge_entitlement_has_feature_field(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        ent_svc = EntitlementsService(test_session)
+        result = await ent_svc.can_create_charge(authed_org.id)
+        assert "feature" in result
+        assert result["feature"] == "charges"
+        assert "plan_name" in result
+
+    @pytest.mark.asyncio
+    async def test_ocr_entitlement_has_feature_field(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        ent_svc = EntitlementsService(test_session)
+        result = await ent_svc.can_use_ocr(authed_org.id)
+        assert "feature" in result
+        assert result["feature"] == "ocr"
+        assert result["plan_name"] == "Free"
+
+    @pytest.mark.asyncio
+    async def test_whatsapp_entitlement_has_feature_field(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        ent_svc = EntitlementsService(test_session)
+        result = await ent_svc.can_process_whatsapp_message(authed_org.id)
+        assert "feature" in result
+        assert result["feature"] == "whatsapp_messages"
+
+    @pytest.mark.asyncio
+    async def test_all_entitlements_return_plan_name(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        ent_svc = EntitlementsService(test_session)
+        checks = [
+            ent_svc.can_create_charge(authed_org.id),
+            ent_svc.can_create_customer(authed_org.id),
+            ent_svc.can_create_template(authed_org.id),
+            ent_svc.can_create_recurring_task(authed_org.id),
+            ent_svc.can_use_ocr(authed_org.id),
+            ent_svc.can_export_pdf(authed_org.id),
+            ent_svc.can_use_advanced_analytics(authed_org.id),
+            ent_svc.can_use_collection_rules(authed_org.id),
+            ent_svc.can_add_team_member(authed_org.id),
+            ent_svc.can_process_whatsapp_message(authed_org.id),
+        ]
+        results = []
+        for c in checks:
+            results.append(await c)
+        for r in results:
+            assert "plan_name" in r
+            assert "feature" in r
+
+
+class TestUsageIntegrity:
+    @pytest.mark.asyncio
+    async def test_usage_does_not_increment_on_blocked(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        # Fill up charges to limit (20)
+        await service.increment_usage(authed_org.id, "charges_created", 20)
+        ent_svc = EntitlementsService(test_session)
+        result = await ent_svc.can_create_charge(authed_org.id)
+        assert result["allowed"] is False
+        # Usage should still be 20, not 21
+        usage = await service.get_usage(authed_org.id)
+        assert usage.charges_created == 20
+
+    @pytest.mark.asyncio
+    async def test_usage_separate_per_org(self, test_session, authed_org):
+        user2 = User(name="User2", email="u2@test.com", hashed_password="x", phone_number="+5511")
+        test_session.add(user2)
+        await test_session.commit()
+        await test_session.refresh(user2)
+        org2 = Organization(name="Org2", slug=f"org2-{user2.id}", owner_user_id=user2.id)
+        test_session.add(org2)
+        await test_session.commit()
+        await test_session.refresh(org2)
+
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.ensure_free_subscription(org2.id)
+
+        await service.increment_usage(authed_org.id, "charges_created", 5)
+        await service.increment_usage(org2.id, "charges_created", 3)
+
+        usage1 = await service.get_usage(authed_org.id)
+        usage2 = await service.get_usage(org2.id)
+        assert usage1.charges_created == 5
+        assert usage2.charges_created == 3
+
+    @pytest.mark.asyncio
+    async def test_no_duplicate_subscription_for_org(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        sub1 = await service.ensure_free_subscription(authed_org.id)
+        sub2 = await service.ensure_free_subscription(authed_org.id)
+        assert sub1.id == sub2.id
+
+
+class TestBillingEventIdempotency:
+    @pytest.mark.asyncio
+    async def test_duplicate_provider_event_id_skipped(self, test_session, authed_org):
+        from app.models.billing import BillingEvent
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        # Record event with provider_event_id
+        await service._record_event(
+            organization_id=authed_org.id,
+            subscription_id=1,
+            event_type="fake_checkout",
+            provider="fake",
+            payload={"plan_code": "starter"},
+            provider_event_id="evt_123",
+        )
+        await test_session.commit()
+        # Try to record same event again
+        await service._record_event(
+            organization_id=authed_org.id,
+            subscription_id=1,
+            event_type="fake_checkout",
+            provider="fake",
+            payload={"plan_code": "starter"},
+            provider_event_id="evt_123",
+        )
+        await test_session.commit()
+        events = await service.get_billing_events(authed_org.id)
+        dup_events = [e for e in events if e.provider_event_id == "evt_123"]
+        assert len(dup_events) == 1
+
+    @pytest.mark.asyncio
+    async def test_payload_secrets_redacted(self, test_session, authed_org):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service._record_event(
+            organization_id=authed_org.id,
+            subscription_id=1,
+            event_type="test_event",
+            provider="fake",
+            payload={"plan_code": "starter", "api_key": "secret123", "token": "abc"},
+        )
+        await test_session.commit()
+        events = await service.get_billing_events(authed_org.id)
+        test_event = [e for e in events if e.event_type == "test_event"][0]
+        assert test_event.payload["api_key"] == "[REDACTED]"
+        assert test_event.payload["token"] == "[REDACTED]"
+        assert test_event.payload["plan_code"] == "starter"
+
+    @pytest.mark.asyncio
+    async def test_events_are_org_scoped(self, test_session, authed_org):
+        user2 = User(name="U2", email="u2@t.com", hashed_password="x", phone_number="+5511")
+        test_session.add(user2)
+        await test_session.commit()
+        await test_session.refresh(user2)
+        org2 = Organization(name="O2", slug=f"o2-{user2.id}", owner_user_id=user2.id)
+        test_session.add(org2)
+        await test_session.commit()
+        await test_session.refresh(org2)
+
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        await service.ensure_free_subscription(org2.id)
+
+        events1 = await service.get_billing_events(authed_org.id)
+        events2 = await service.get_billing_events(org2.id)
+        for e in events1:
+            assert e.organization_id == authed_org.id
+        for e in events2:
+            assert e.organization_id == org2.id
+
+
+class TestProviderFactoryHardening:
+    @pytest.mark.asyncio
+    async def test_default_provider_is_fake(self):
+        from app.billing_providers.factory import get_billing_provider
+        provider = get_billing_provider()
+        assert provider.name == "fake"
+
+    @pytest.mark.asyncio
+    async def test_unknown_provider_falls_back_in_testing(self):
+        from app.billing_providers.factory import get_billing_provider
+        provider = get_billing_provider("unknown_xyz")
+        assert provider.name == "fake"
+
+    @pytest.mark.asyncio
+    async def test_production_rejects_unknown_provider(self, monkeypatch):
+        from app.billing_providers.factory import get_billing_provider
+        from app.core.config import settings
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+        with pytest.raises(ValueError, match="Unknown billing provider"):
+            get_billing_provider("unknown_xyz")
+
+    @pytest.mark.asyncio
+    async def test_production_accepts_fake(self, monkeypatch):
+        from app.billing_providers.factory import get_billing_provider
+        from app.core.config import settings
+        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+        provider = get_billing_provider("fake")
+        assert provider.name == "fake"
+
+    @pytest.mark.asyncio
+    async def test_demo_mode_forces_fake(self, monkeypatch):
+        from app.billing_providers.factory import get_billing_provider
+        from app.core.config import settings
+        monkeypatch.setattr(settings, "ENABLE_DEMO_MODE", True)
+        provider = get_billing_provider("stripe_sandbox")
+        assert provider.name == "fake"
+
+
+class TestRBACBilling:
+    @pytest_asyncio.fixture
+    async def viewer_user_and_token(self, test_session, authed_org):
+        viewer = User(
+            name="Viewer", email="viewer@test.com", hashed_password="x",
+            phone_number="+5511888888888"
+        )
+        test_session.add(viewer)
+        await test_session.flush()
+        test_session.add(OrganizationMember(
+            organization_id=authed_org.id,
+            user_id=viewer.id,
+            role=OrganizationRole.VIEWER,
+            active=True,
+            joined_at=datetime.now(timezone.utc),
+        ))
+        test_session.add(Subscription(user_id=viewer.id, plan="free", status="active"))
+        await test_session.commit()
+        await test_session.refresh(viewer)
+        token = create_access_token(data={"sub": str(viewer.id)})
+        return viewer, {"Authorization": f"Bearer {token}"}
+
+    @pytest_asyncio.fixture
+    async def finance_user_and_token(self, test_session, authed_org):
+        finance = User(
+            name="Finance", email="finance@test.com", hashed_password="x",
+            phone_number="+5511777777777"
+        )
+        test_session.add(finance)
+        await test_session.flush()
+        test_session.add(OrganizationMember(
+            organization_id=authed_org.id,
+            user_id=finance.id,
+            role=OrganizationRole.FINANCE,
+            active=True,
+            joined_at=datetime.now(timezone.utc),
+        ))
+        test_session.add(Subscription(user_id=finance.id, plan="free", status="active"))
+        await test_session.commit()
+        await test_session.refresh(finance)
+        token = create_access_token(data={"sub": str(finance.id)})
+        return finance, {"Authorization": f"Bearer {token}"}
+
+    @pytest.mark.asyncio
+    async def test_viewer_cannot_change_plan(self, client, viewer_user_and_token, authed_org, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        _, headers = viewer_user_and_token
+        headers = {**headers, "X-Organization-ID": str(authed_org.id)}
+        resp = await client.post(
+            "/saas-billing/subscription/change-plan",
+            json={"plan_code": "professional"},
+            headers=headers,
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_finance_cannot_change_plan(self, client, finance_user_and_token, authed_org, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        _, headers = finance_user_and_token
+        headers = {**headers, "X-Organization-ID": str(authed_org.id)}
+        resp = await client.post(
+            "/saas-billing/subscription/change-plan",
+            json={"plan_code": "professional"},
+            headers=headers,
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_finance_can_view_usage(self, client, finance_user_and_token, authed_org, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        _, headers = finance_user_and_token
+        headers = {**headers, "X-Organization-ID": str(authed_org.id)}
+        resp = await client.get("/saas-billing/usage", headers=headers)
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_viewer_can_view_subscription(self, client, viewer_user_and_token, authed_org, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        _, headers = viewer_user_and_token
+        headers = {**headers, "X-Organization-ID": str(authed_org.id)}
+        resp = await client.get("/saas-billing/subscription", headers=headers)
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_viewer_cannot_cancel(self, client, viewer_user_and_token, authed_org, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        _, headers = viewer_user_and_token
+        headers = {**headers, "X-Organization-ID": str(authed_org.id)}
+        resp = await client.post("/saas-billing/subscription/cancel", headers=headers)
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_viewer_cannot_fake_checkout(self, client, viewer_user_and_token, authed_org, test_session):
+        service = SaaSBillingService(test_session)
+        await service.seed_plans()
+        await service.ensure_free_subscription(authed_org.id)
+        _, headers = viewer_user_and_token
+        headers = {**headers, "X-Organization-ID": str(authed_org.id)}
+        resp = await client.post(
+            "/saas-billing/fake/checkout",
+            json={"plan_code": "business"},
+            headers=headers,
+        )
+        assert resp.status_code == 403
+
+
+class TestListPlansIncludesWhatsApp:
+    @pytest.mark.asyncio
+    async def test_list_plans_has_whatsapp_limit(self, client, auth_headers, authed_org):
+        resp = await client.get("/saas-billing/plans", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        for plan in data:
+            assert "max_whatsapp_messages_per_month" in plan

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { saasBillingAPI } from '../services/api';
+import { saasBillingAPI, organizationsAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import {
   CreditCard, Check, X, AlertTriangle, TrendingUp, Zap, Crown,
@@ -112,16 +112,24 @@ export default function BillingSection() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [userRole, setUserRole] = useState<string>('viewer');
+
+  const canManage = userRole === 'owner' || userRole === 'admin';
 
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [plansRes, subRes] = await Promise.all([
+      const [plansRes, subRes, orgsRes] = await Promise.all([
         saasBillingAPI.getPlans(),
         saasBillingAPI.getSubscription().catch(() => null),
+        organizationsAPI.list().catch(() => null),
       ]);
       setPlans(plansRes.data || []);
       if (subRes) setSummary(subRes.data);
+      if (orgsRes && orgsRes.data && orgsRes.data.length > 0) {
+        const selected = orgsRes.data.find((o: any) => o.id === orgsRes.data[0].id) || orgsRes.data[0];
+        setUserRole(selected.role || 'viewer');
+      }
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
@@ -195,7 +203,7 @@ export default function BillingSection() {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 mt-6">
+      <div data-testid="billing-section" className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Planos &amp; Cobrança</h2>
@@ -207,10 +215,30 @@ export default function BillingSection() {
     );
   }
 
+  if (error && !summary) {
+    return (
+      <div data-testid="billing-section" className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 mt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Planos &amp; Cobrança</h2>
+        </div>
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+            <button onClick={fetchAll} className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const currentPlanCode = summary?.plan?.code || 'free';
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 mt-6">
+    <div data-testid="billing-section" className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 mt-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -241,7 +269,7 @@ export default function BillingSection() {
 
       {/* Current subscription status */}
       {summary && (
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div data-testid="current-plan-card" className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Plano atual</p>
@@ -262,7 +290,7 @@ export default function BillingSection() {
               </div>
             </div>
             <div className="flex gap-2">
-              {summary.subscription.cancel_at_period_end ? (
+              {canManage && summary.subscription.cancel_at_period_end ? (
                 <button
                   onClick={handleReactivate}
                   disabled={actionLoading === 'reactivate'}
@@ -270,7 +298,7 @@ export default function BillingSection() {
                 >
                   {actionLoading === 'reactivate' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reativar'}
                 </button>
-              ) : (
+              ) : canManage ? (
                 <button
                   onClick={handleCancel}
                   disabled={actionLoading === 'cancel'}
@@ -278,7 +306,7 @@ export default function BillingSection() {
                 >
                   {actionLoading === 'cancel' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancelar'}
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -286,7 +314,7 @@ export default function BillingSection() {
 
       {/* Usage meters */}
       {summary && (
-        <div className="mb-6">
+        <div data-testid="usage-meters" className="mb-6">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Uso do período atual</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <UsageMeter
@@ -344,6 +372,7 @@ export default function BillingSection() {
           return (
             <div
               key={plan.code}
+              data-testid={`plan-card-${plan.code}`}
               className={`relative rounded-xl border-2 p-4 transition-all ${PLAN_COLORS[plan.code] || 'border-gray-300'} ${PLAN_BG[plan.code] || 'bg-gray-50'} ${isCurrent ? 'ring-2 ring-blue-500' : ''}`}
             >
               {isCurrent && (
@@ -370,8 +399,9 @@ export default function BillingSection() {
                 <FeatureItem included={plan.allow_advanced_analytics} text="Analytics avançado" />
                 <FeatureItem included={plan.allow_whatsapp_intelligence} text="WhatsApp IA" />
               </ul>
-              {!isCurrent && (
+              {!isCurrent && canManage && (
                 <button
+                  data-testid="change-plan-button"
                   onClick={() => handleChangePlan(plan.code)}
                   disabled={isLoading}
                   className="w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
@@ -379,7 +409,7 @@ export default function BillingSection() {
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Trocar plano'}
                 </button>
               )}
-              {!isCurrent && plan.price_monthly !== '0.00' && (
+              {!isCurrent && canManage && plan.price_monthly !== '0.00' && (
                 <button
                   onClick={() => handleFakeCheckout(plan.code)}
                   disabled={isLoading}
@@ -398,7 +428,7 @@ export default function BillingSection() {
         })}
       </div>
 
-      <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-2">
+      <div data-testid="billing-sandbox-warning" className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-start gap-2">
         <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
         <p className="text-xs text-amber-700 dark:text-amber-300">
           Os checkouts são simulados no modo sandbox. Nenhum pagamento real é processado.
