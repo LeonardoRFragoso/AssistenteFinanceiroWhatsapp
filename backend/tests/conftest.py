@@ -15,6 +15,13 @@ from app.models.collection_message_log import CollectionMessageLog
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.recurring_task import RecurringTask, RecurringTaskLog
 from app.models.billing import SubscriptionPlan, OrganizationSubscription, UsageCounter, BillingEvent, SubscriptionStatus, BillingProvider
+from app.models.provider_foundation import (
+    ProviderConnection, ProviderWebhookEvent, OpenFinanceConsent,
+    OrganizationAuditLog, TransactionAuthorization,
+)
+from app.models.open_finance import (
+    ConnectedAccount, BankTransaction, FinancialCategory, OpenFinanceSyncLog,
+)
 from datetime import datetime, timezone
 
 

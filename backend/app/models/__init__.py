@@ -22,6 +22,11 @@ from app.models.billing import (
     SubscriptionPlan, OrganizationSubscription, UsageCounter, BillingEvent,
     SubscriptionStatus, BillingProvider,
 )
+from app.models.open_finance import (
+    ConnectedAccount, BankTransaction, FinancialCategory, OpenFinanceSyncLog,
+    ConnectedAccountStatus, TransactionType, TransactionStatus,
+    SyncType, SyncStatus, CategoryType,
+)
 
 __all__ = [
     "User",
@@ -63,4 +68,14 @@ __all__ = [
     "BillingEvent",
     "SubscriptionStatus",
     "BillingProvider",
+    "ConnectedAccount",
+    "BankTransaction",
+    "FinancialCategory",
+    "OpenFinanceSyncLog",
+    "ConnectedAccountStatus",
+    "TransactionType",
+    "TransactionStatus",
+    "SyncType",
+    "SyncStatus",
+    "CategoryType",
 ]

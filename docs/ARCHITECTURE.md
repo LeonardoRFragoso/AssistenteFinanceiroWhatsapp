@@ -33,7 +33,7 @@ backend/
 │   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, providers, etc.)
 │   ├── providers/      # Payment providers (fake, mercado_pago, asaas) — Sprint 15
 │   ├── billing_providers/  # SaaS billing providers (base, fake, factory)
-│   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory) — Sprint 13
+│   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory, open_finance_fake) — Sprint 13/16
 │   ├── integrations/   # External integrations (Twilio, AsaasClient) — Sprint 15
 │   ├── jobs/           # Background jobs (reminder_scheduler)
 │   └── utils/          # Dependencies, middleware
@@ -414,3 +414,47 @@ Integrates Asaas API v3 in sandbox mode for receive-only charge creation (Pix, b
 - Only receive-only operations (no Pix Out, no withdrawals)
 
 See: `docs/SPRINT_15_ASAAS_SANDBOX_PROVIDER.md`
+
+## Sprint 16: Open Finance Read Provider Foundation
+
+**Fake/sandbox Open Finance read provider** for demo and development. No real bank connections.
+
+**New models** (`app/models/open_finance.py`):
+- `ConnectedAccount` — bank accounts linked via Open Finance consent
+- `BankTransaction` — financial movements with category, merchant, amount
+- `FinancialCategory` — income/expense/transfer categories
+- `OpenFinanceSyncLog` — sync operation audit trail
+
+**Fake provider** (`app/regulated_providers/open_finance_fake.py`):
+- `FakeOpenFinanceReadProvider` — generates realistic demo data
+- 2 fake accounts, 20-40 transactions, 12 categories
+- All data marked `is_demo_data=True`
+
+**Services:**
+- `app/services/open_finance_service.py` — consent, sync, audit logging
+- `app/services/bank_transaction_service.py` — listing, filtering, grouping
+- `app/services/financial_summary_service.py` — monthly summaries, safe insights
+
+**Router** (`app/routers/open_finance.py`):
+- `/open-finance/status` — provider status
+- `/open-finance/consents/*` — consent CRUD
+- `/open-finance/accounts` — list connected accounts
+- `/open-finance/sync/fake` — sync demo data
+- `/open-finance/transactions/*` — list, summary, categories, merchants
+- `/open-finance/sync-logs` — sync operation logs
+
+**WhatsApp intents:**
+- `open_finance_balance_summary`, `open_finance_recent_transactions`
+- `open_finance_monthly_summary`, `open_finance_category_summary`
+- `open_finance_search_transactions`
+
+**Frontend:** `frontend/components/OpenFinanceSection.tsx`
+
+**Security:**
+- `ENABLE_OPEN_FINANCE` defaults false
+- `OPEN_FINANCE_PROVIDER` defaults "fake"
+- No real API calls, no real tokens, no payment initiation
+- All data org-scoped with RBAC
+- Audit logging for all operations
+
+See: `docs/SPRINT_16_OPEN_FINANCE_FOUNDATION.md`

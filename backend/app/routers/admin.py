@@ -647,6 +647,50 @@ async def get_billing_metrics(
             "audit_logs_total": audit_logs_total,
         }
 
+        # Open Finance read metrics — Sprint 16
+        from app.models.open_finance import (
+            ConnectedAccount, BankTransaction, OpenFinanceSyncLog,
+            ConnectedAccountStatus, SyncStatus,
+        )
+        of_accounts_total = (await db.execute(
+            select(func.count(ConnectedAccount.id))
+        )).scalar()
+        of_accounts_active = (await db.execute(
+            select(func.count(ConnectedAccount.id)).where(
+                ConnectedAccount.status == ConnectedAccountStatus.ACTIVE
+            )
+        )).scalar()
+        of_demo_accounts = (await db.execute(
+            select(func.count(ConnectedAccount.id)).where(
+                ConnectedAccount.is_demo_data == True
+            )
+        )).scalar()
+        of_transactions_total = (await db.execute(
+            select(func.count(BankTransaction.id))
+        )).scalar()
+        of_demo_transactions = (await db.execute(
+            select(func.count(BankTransaction.id)).where(
+                BankTransaction.is_demo_data == True
+            )
+        )).scalar()
+        of_sync_logs_by_status = {}
+        for s in SyncStatus:
+            c = (await db.execute(
+                select(func.count(OpenFinanceSyncLog.id)).where(
+                    OpenFinanceSyncLog.status == s
+                )
+            )).scalar()
+            of_sync_logs_by_status[s.value] = c
+
+        open_finance_metrics = {
+            "connected_accounts_total": of_accounts_total,
+            "connected_accounts_active": of_accounts_active,
+            "connected_accounts_demo": of_demo_accounts,
+            "bank_transactions_total": of_transactions_total,
+            "bank_transactions_demo": of_demo_transactions,
+            "sync_logs_by_status": of_sync_logs_by_status,
+        }
+
         return {
             "subscriptions_by_status": status_counts,
             "organizations_by_plan": orgs_by_plan,
@@ -658,6 +702,12 @@ async def get_billing_metrics(
             "webhook_events_by_status": provider_metrics["webhook_events_by_status"],
             "transaction_authorizations_by_status": provider_metrics["tx_auths_by_status"],
             "audit_logs_total": provider_metrics["audit_logs_total"],
+            "open_finance_connected_accounts_total": open_finance_metrics["connected_accounts_total"],
+            "open_finance_connected_accounts_active": open_finance_metrics["connected_accounts_active"],
+            "open_finance_connected_accounts_demo": open_finance_metrics["connected_accounts_demo"],
+            "open_finance_bank_transactions_total": open_finance_metrics["bank_transactions_total"],
+            "open_finance_bank_transactions_demo": open_finance_metrics["bank_transactions_demo"],
+            "open_finance_sync_logs_by_status": open_finance_metrics["sync_logs_by_status"],
         }
 
     except Exception as e:
