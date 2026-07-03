@@ -1,7 +1,10 @@
 # Consent and Authorization Model
 
 > Sprint 13 — Jota Feature Parity Blueprint
+> Sprint 14 — Consent & transaction auth foundation implemented
 > Define o modelo de consentimento, autorização e confirmação para o PayFlow AI.
+
+> **Sprint 14 Update:** `open_finance_consents` table and `OpenFinanceConsentService` implemented (fake consent only). `transaction_authorizations` table and `TransactionAuthorizationService` implemented (6-digit challenge, SHA-256 hashed, 5-min expiry, max 3 attempts). Audit logging via `OrganizationAuditService`. See `docs/SPRINT_14_PROVIDER_FOUNDATION.md`.
 
 ---
 

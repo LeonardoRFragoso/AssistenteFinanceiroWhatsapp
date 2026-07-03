@@ -589,11 +589,75 @@ async def get_billing_metrics(
             select(func.count(text("1"))).select_from(text("billing_events"))
         )).scalar()
 
+        # Provider foundation metrics
+        from app.models.provider_foundation import (
+            ProviderConnection, ProviderWebhookEvent,
+            OpenFinanceConsent, OrganizationAuditLog,
+            TransactionAuthorization, ProviderConnectionStatus,
+            WebhookEventStatus, ConsentStatus, AuthorizationStatus,
+        )
+
+        connections_total = (await db.execute(
+            select(func.count(ProviderConnection.id))
+        )).scalar()
+        connections_active = (await db.execute(
+            select(func.count(ProviderConnection.id)).where(
+                ProviderConnection.active == True,
+                ProviderConnection.status == ProviderConnectionStatus.ACTIVE,
+            )
+        )).scalar()
+
+        of_consents_by_status = {}
+        for s in ConsentStatus:
+            c = (await db.execute(
+                select(func.count(OpenFinanceConsent.id)).where(
+                    OpenFinanceConsent.status == s
+                )
+            )).scalar()
+            of_consents_by_status[s.value] = c
+
+        webhook_events_by_status = {}
+        for s in WebhookEventStatus:
+            c = (await db.execute(
+                select(func.count(ProviderWebhookEvent.id)).where(
+                    ProviderWebhookEvent.status == s
+                )
+            )).scalar()
+            webhook_events_by_status[s.value] = c
+
+        tx_auths_by_status = {}
+        for s in AuthorizationStatus:
+            c = (await db.execute(
+                select(func.count(TransactionAuthorization.id)).where(
+                    TransactionAuthorization.status == s
+                )
+            )).scalar()
+            tx_auths_by_status[s.value] = c
+
+        audit_logs_total = (await db.execute(
+            select(func.count(OrganizationAuditLog.id))
+        )).scalar()
+
+        provider_metrics = {
+            "connections_total": connections_total,
+            "connections_active": connections_active,
+            "of_consents_by_status": of_consents_by_status,
+            "webhook_events_by_status": webhook_events_by_status,
+            "tx_auths_by_status": tx_auths_by_status,
+            "audit_logs_total": audit_logs_total,
+        }
+
         return {
             "subscriptions_by_status": status_counts,
             "organizations_by_plan": orgs_by_plan,
             "usage_totals": usage,
             "total_billing_events": total_events,
+            "provider_connections_total": provider_metrics["connections_total"],
+            "provider_connections_active": provider_metrics["connections_active"],
+            "open_finance_consents_by_status": provider_metrics["of_consents_by_status"],
+            "webhook_events_by_status": provider_metrics["webhook_events_by_status"],
+            "transaction_authorizations_by_status": provider_metrics["tx_auths_by_status"],
+            "audit_logs_total": provider_metrics["audit_logs_total"],
         }
 
     except Exception as e:

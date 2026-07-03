@@ -1,8 +1,11 @@
 # Regulated Provider Architecture
 
 > Sprint 13 — Jota Feature Parity Blueprint
+> Sprint 14 — Provider Foundation implemented (tables, services, endpoints)
 > Define interfaces futuras para providers regulados.
 > **Nenhum provider real é implementado nesta sprint.**
+
+> **Sprint 14 Update:** 5 database tables created (`provider_connections`, `provider_webhook_events`, `open_finance_consents`, `organization_audit_logs`, `transaction_authorizations`), 5 services, 14 API endpoints with RBAC, and 35 tests. All providers remain fake/sandbox. See `docs/SPRINT_14_PROVIDER_FOUNDATION.md`.
 
 ---
 

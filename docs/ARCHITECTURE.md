@@ -29,8 +29,8 @@ backend/
 │   ├── models/         # SQLAlchemy models (User, Charge, Transaction, billing, etc.)
 │   ├── schemas/        # Pydantic schemas
 │   ├── repositories/   # Data access layer
-│   ├── services/       # Business logic (AIService, ChargeService, SaaSBillingService, EntitlementsService, etc.)
-│   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, etc.)
+│   ├── services/       # Business logic (AIService, ChargeService, SaaSBillingService, EntitlementsService, ProviderConnectionService, etc.)
+│   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, providers, etc.)
 │   ├── providers/      # Payment providers (fake, mercado_pago)
 │   ├── billing_providers/  # SaaS billing providers (base, fake, factory)
 │   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory) — Sprint 13
@@ -357,3 +357,33 @@ ENABLE_REAL_BANKING=false
 - **Production + fake**: Works normally
 
 See: `docs/REGULATED_PROVIDER_ARCHITECTURE.md`, `docs/JOTA_PARITY_ROADMAP.md`
+
+### Provider Foundation (Sprint 14)
+
+5 new tables provide the data layer for regulated provider integration:
+
+```
+provider_connections        — Registry of org-provider connections (fake/sandbox)
+provider_webhook_events     — Idempotent webhook event log (sanitized)
+open_finance_consents       — Open Finance consent records (fake only)
+organization_audit_logs     — Audit trail with hashed IP/user-agent
+transaction_authorizations  — 6-digit challenge auth (hashed code, 5min expiry)
+```
+
+**Services:**
+- `ProviderConnectionService` — CRUD + feature flag validation + audit logging
+- `ProviderWebhookService` — Event recording + sanitization + idempotency
+- `OpenFinanceConsentService` — Fake consent creation + revocation + expiry
+- `OrganizationAuditService` — Audit logging + metadata sanitization + IP/UA hashing
+- `TransactionAuthorizationService` — Challenge creation + confirmation + expiry
+
+**Router:** `/providers` with 14 endpoints, RBAC-enforced.
+
+**Security:**
+- No secrets stored in plaintext (`secret_ref` = external reference only)
+- Transaction auth codes hashed with SHA-256
+- IP/user-agent hashed with SHA-256 in audit logs
+- Webhook payloads/headers sanitized (secrets redacted)
+- All providers default to fake; real providers blocked by feature flags
+
+See: `docs/SPRINT_14_PROVIDER_FOUNDATION.md`
