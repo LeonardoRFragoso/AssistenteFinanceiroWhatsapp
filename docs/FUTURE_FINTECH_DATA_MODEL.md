@@ -1,8 +1,10 @@
 # Future Fintech Data Model
 
 > Sprint 13 — Jota Feature Parity Blueprint
+> Sprint 14 — 5 of 13 proposed tables implemented
 > Proposta de modelagem para funcionalidades fintech futuras.
-> **Nenhuma tabela é criada nesta sprint.** Apenas documentação.
+
+> **Sprint 14 Update:** 5 of the 13 proposed tables have been implemented: `provider_connections`, `provider_webhook_events`, `open_finance_consents`, `organization_audit_logs`, and `transaction_authorizations` (named `transaction_authorizations` instead of `payment_authorizations`). Migration `k1f2g3h4i5j6`. The remaining 8 tables (connected_accounts, bank_transactions, detected_bills, bill_payment_intents, payment_receipts, kyc_profiles, kyb_profiles, risk_events) are planned for future sprints. See `docs/SPRINT_14_PROVIDER_FOUNDATION.md`.
 
 ---
 

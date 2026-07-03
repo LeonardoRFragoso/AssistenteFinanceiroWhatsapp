@@ -30,6 +30,11 @@ ORG_SCOPED_TABLES = [
     "organization_subscriptions",
     "usage_counters",
     "billing_events",
+    "provider_connections",
+    "provider_webhook_events",
+    "open_finance_consents",
+    "organization_audit_logs",
+    "transaction_authorizations",
 ]
 
 

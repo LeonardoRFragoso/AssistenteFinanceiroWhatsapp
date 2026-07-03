@@ -1,5 +1,19 @@
 # Security Hardening — PayFlow AI
 
+## Provider Foundation Security (Sprint 14)
+
+- **No secrets in plaintext**: `secret_ref` field in `provider_connections` stores only external references, never actual secrets, tokens, or credentials.
+- **Transaction auth code hashing**: 6-digit challenge codes are hashed with SHA-256 before storage. Code is never saved in plaintext. In production, the code is not returned in API responses.
+- **IP/user-agent hashing**: Audit logs store SHA-256 hashes of IP addresses and user agents, never raw values.
+- **Payload sanitization**: Webhook payloads and headers are sanitized before storage. Sensitive keys (`password`, `secret`, `token`, `api_key`, `authorization`, `credential`, etc.) are replaced with `[REDACTED]`.
+- **Metadata sanitization**: Audit log metadata is sanitized using the same sensitive-key redaction.
+- **Webhook idempotency**: Unique constraint on `(provider_type, provider_name, provider_event_id)` prevents duplicate event processing.
+- **Feature flag enforcement**: `ProviderConnectionService.validate_provider_activation()` blocks real providers when feature flags are false. Demo mode forces fake. Production rejects unimplemented real providers.
+- **RBAC on all endpoints**: Provider connections (create/deactivate) restricted to owner/admin. Audit logs restricted to owner/admin. Transaction auth requires owner/admin/finance. Viewer role limited to status/flags only.
+- **Organization isolation**: All 5 new tables are scoped by `organization_id` with foreign key constraints and indexes. Multi-tenant audit script includes all new tables.
+- **No real regulated operations**: All providers default to fake. No Open Finance, Pix Out, bill payment, KYC, DDA, or banking operations are implemented. This sprint creates only the foundation.
+- **Transaction auth limits**: 5-minute expiry, maximum 3 failed attempts, automatic expiry of pending authorizations.
+
 ## Regulated Provider Architecture (Sprint 13)
 
 - **Feature flags**: 6 regulated feature flags (`ENABLE_OPEN_FINANCE`, `ENABLE_BILL_PAYMENT`, `ENABLE_PIX_OUT`, `ENABLE_KYC`, `ENABLE_DDA`, `ENABLE_REAL_BANKING`) — all default `false`. No regulated feature can be activated without explicit configuration.

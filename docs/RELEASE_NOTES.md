@@ -1,5 +1,24 @@
 # PayFlow AI — Release Notes
 
+## Sprint 14: Provider Foundation, Consent, Audit Logs & Transaction Auth
+
+- **5 new tables**: `provider_connections`, `provider_webhook_events`, `open_finance_consents`, `organization_audit_logs`, `transaction_authorizations` — all org-scoped with proper indexes.
+- **Migration**: `k1f2g3h4i5j6` — compatible with SQLite and PostgreSQL, single head.
+- **5 new services**: ProviderConnectionService, ProviderWebhookService, OpenFinanceConsentService, OrganizationAuditService, TransactionAuthorizationService.
+- **Provider connection registry**: Create/list/deactivate fake/sandbox connections. Real providers blocked by feature flags. Demo mode forces fake. Production rejects unimplemented real providers.
+- **Webhook idempotency**: Unique constraint on `(provider_type, provider_name, provider_event_id)`. Payloads and headers sanitized (secrets/token/key/password redacted). Duplicate detection.
+- **Open Finance consent (fake)**: Creates fake consent with fake authorization URL. List/revoke/expire. No real consent initiation.
+- **Audit logs**: Sensitive actions logged with SHA-256 hashed IP/user-agent. Metadata sanitized. Filterable by action/resource/provider with pagination.
+- **Transaction authorization**: 6-digit challenge code hashed with SHA-256 (never stored in plaintext). 5-minute expiry, max 3 attempts. Code returned only in testing/demo — never in production.
+- **New router**: `/providers` with 14 endpoints — connections, consents, audit logs, transaction auth, provider status, feature flags, webhook fake.
+- **RBAC**: owner/admin (create/deactivate connections, create/revoke consents, view audit logs), finance (list connections/consents, create/confirm/cancel auth), viewer (status/flags only).
+- **Provider status endpoint**: `GET /providers/status` returns environment, demo_mode, and per-provider status with `real_operation_allowed` flag.
+- **Feature flags endpoint**: `GET /providers/feature-flags` returns all 6 regulated flags — no secrets exposed.
+- **Admin metrics updated**: `/admin/billing-metrics` now includes provider connections total/active, consents by status, webhooks by status, transaction auths by status, audit logs total.
+- **Multi-tenant audit**: Script updated to include 5 new tables. All 15 tables pass with 0 orphans.
+- **Tests**: 35 new tests (22 provider foundation + 13 transaction authorization). 434 backend tests pass. 0 failures.
+- **Security**: No secrets in plaintext. No real regulated operations. All behind feature flags. IP/user-agent hashed. Payloads/headers/metadata sanitized.
+
 ## Sprint 13: Jota Feature Parity Blueprint & Regulated Provider Architecture
 
 - **Competitor research**: Comprehensive research of Jota (jota.ai) with 18 sources, 10 confirmed feature categories, parceiros (Celcoin, Unico, Meta), and business model analysis.
