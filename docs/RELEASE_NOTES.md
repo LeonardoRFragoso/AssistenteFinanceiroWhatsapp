@@ -1,5 +1,13 @@
 # PayFlow AI — Release Notes
 
+## Sprint 16.1: Test Suite Stabilization, Count Consistency & Open Finance Readiness
+
+- **Fixed `test_asaas_config_defaults` failure**: Root cause was shell environment variables (`ASAAS_ENVIRONMENT=production`) overriding pydantic defaults. Fix: `monkeypatch.delenv` for all Asaas env keys + `_env_file=None` to isolate test Settings instances from both `.env` file and shell env vars.
+- **Full suite green**: 559 passed, 0 failed, 0 errors.
+- **README test count corrected**: 516 → 559 backend tests.
+- **Release notes test count corrected**: 516 → 559.
+- **No new features**: stabilization sprint only.
+
 ## Sprint 16: Open Finance Read Provider Foundation
 
 - **Fake/sandbox Open Finance provider**: `FakeOpenFinanceReadProvider` generates realistic demo data (2 accounts, 20-40 transactions, 12 categories). No real API calls to Pluggy/Belvo. All data marked `is_demo_data=True`.
@@ -11,7 +19,7 @@
 - **Frontend**: `OpenFinanceSection.tsx` component with demo badge, consent creation, sync, accounts, and transactions display.
 - **Admin metrics**: Open Finance account/transaction/sync-log counts added to billing-metrics endpoint.
 - **Research doc**: `docs/OPEN_FINANCE_PROVIDER_RESEARCH.md` — Pluggy vs Belvo comparison and recommendations.
-- **Tests**: 43 new tests across 4 files (models, service, router, WhatsApp). Total: 516 backend tests, 0 failures.
+- **Tests**: 43 new tests across 4 files (models, service, router, WhatsApp). Total: 559 backend tests, 0 failures.
 - **Security**: `ENABLE_OPEN_FINANCE` defaults false, `OPEN_FINANCE_PROVIDER` defaults "fake", demo mode forced, no real tokens, no payment initiation, audit logging, org-scoped data.
 
 ## Sprint 15: Asaas Sandbox Charge Provider
