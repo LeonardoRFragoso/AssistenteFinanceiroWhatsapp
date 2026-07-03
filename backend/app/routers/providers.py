@@ -347,3 +347,56 @@ async def receive_webhook(
         payload=payload,
     )
     return event
+
+
+# ============================================================
+# Asaas test-connection endpoint
+# ============================================================
+
+@router.post("/asaas/test-connection")
+async def asaas_test_connection(
+    user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
+):
+    """Test Asaas provider configuration without making API calls.
+
+    Validates that:
+    - Feature flag ENABLE_ASAAS_CHARGE_PROVIDER is true
+    - ASAAS_API_KEY is configured
+    - Demo mode is not active
+    - Environment is sandbox or production
+
+    Does NOT expose any secrets. Does NOT make external API calls.
+    RBAC: owner/admin only.
+    """
+    if role not in (OrganizationRole.OWNER, OrganizationRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owner/admin can test provider connections",
+        )
+
+    result = {
+        "provider": "asaas",
+        "enabled": settings.ENABLE_ASAAS_CHARGE_PROVIDER,
+        "environment": settings.ASAAS_ENVIRONMENT,
+        "demo_mode": settings.ENABLE_DEMO_MODE,
+        "api_key_configured": bool(settings.ASAAS_API_KEY),
+        "webhook_token_configured": bool(settings.ASAAS_WEBHOOK_TOKEN),
+        "api_base_url": settings.ASAAS_API_BASE_URL,
+    }
+
+    if settings.ENABLE_DEMO_MODE:
+        result["status"] = "demo_mode_forces_fake"
+        result["message"] = "Demo mode is active — Asaas provider is not available. Provider will use fake."
+    elif not settings.ENABLE_ASAAS_CHARGE_PROVIDER:
+        result["status"] = "disabled"
+        result["message"] = "ENABLE_ASAAS_CHARGE_PROVIDER is false. Set to true to enable Asaas."
+    elif not settings.ASAAS_API_KEY:
+        result["status"] = "missing_api_key"
+        result["message"] = "ASAAS_API_KEY is not configured. Set it to enable Asaas."
+    else:
+        result["status"] = "ready"
+        result["message"] = f"Asaas provider is configured for {settings.ASAAS_ENVIRONMENT} environment."
+
+    return result

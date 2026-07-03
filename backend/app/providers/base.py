@@ -21,7 +21,8 @@ class PaymentProvider(ABC):
         customer_phone: Optional[str] = None,
         external_reference: Optional[str] = None,
         due_date: Optional[str] = None,
-        payer_email: Optional[str] = None
+        payer_email: Optional[str] = None,
+        billing_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a charge and return provider-specific data.
 
@@ -39,6 +40,14 @@ class PaymentProvider(ABC):
     async def get_charge(self, provider_charge_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve charge data from the provider."""
         raise NotImplementedError
+
+    async def cancel_charge(self, provider_charge_id: str) -> bool:
+        """Cancel a charge at the provider. Optional — default is no-op."""
+        return False
+
+    def validate_webhook(self, headers: Dict[str, Any], payload: Dict[str, Any]) -> bool:
+        """Validate webhook authenticity. Optional — default is True (no validation)."""
+        return True
 
     @abstractmethod
     def parse_webhook_event(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:

@@ -11,6 +11,7 @@ from app.utils.log_sanitizer import sanitize_webhook_data
 from app.utils.webhook_rate_limiter import webhook_rate_limiter
 from app.core.audit_logger import log_webhook_received, log_payment_confirmed
 from app.models.provider_event import ProviderEvent
+from app.models.charge import ChargeStatus
 
 router = APIRouter(prefix="/provider-webhooks", tags=["Provider Webhooks"])
 
@@ -178,6 +179,89 @@ async def mercado_pago_webhook(
         raise
     except Exception as e:
         logger.error(f"Error processing Mercado Pago provider webhook: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error processing webhook"
+        )
+
+
+@router.post("/asaas")
+async def asaas_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
+):
+    """Receive Asaas payment notifications for PayFlow charges.
+
+    Security:
+    - Validates asaas-access-token header against ASAAS_WEBHOOK_TOKEN
+    - Idempotent: duplicate events are not re-processed
+    - Rate limited per IP
+    - No sensitive payload data is logged
+    """
+    await webhook_rate_limiter.check(request, "asaas")
+
+    try:
+        body = await request.json()
+        headers = {k.lower(): v for k, v in request.headers.items()}
+
+        from app.providers.asaas_provider import AsaasPaymentProvider
+
+        asaas_provider = AsaasPaymentProvider.__new__(AsaasPaymentProvider)
+        asaas_provider.name = "asaas"
+
+        if not asaas_provider.validate_webhook(headers, body):
+            logger.warning("Invalid Asaas webhook token — rejecting")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid webhook token"
+            )
+
+        event_id = body.get("id")
+        payment_obj = body.get("payment", {})
+        payment_id = payment_obj.get("id") if isinstance(payment_obj, dict) else None
+
+        if event_id:
+            existing = await db.execute(
+                select(ProviderEvent).where(
+                    ProviderEvent.provider == "asaas",
+                    ProviderEvent.external_id == str(event_id),
+                    ProviderEvent.processed == True
+                ).limit(1)
+            )
+            if existing.scalar_one_or_none():
+                logger.info(f"Duplicate Asaas webhook event_id={event_id} — skipping")
+                return {"status": "duplicate", "detail": "Event already processed"}
+
+        event_name = body.get("event", "unknown")
+        log_webhook_received("asaas", event_name, payment_id)
+
+        service = ChargeService(db)
+        charge = await service.process_webhook_payload("asaas", body)
+
+        if charge:
+            if event_id:
+                events = await db.execute(
+                    select(ProviderEvent).where(
+                        ProviderEvent.provider == "asaas",
+                        ProviderEvent.external_id == str(event_id)
+                    )
+                )
+                from datetime import datetime, timezone
+                for event in events.scalars().all():
+                    event.processed = True
+                    event.processed_at = datetime.now(timezone.utc)
+                await db.commit()
+
+            if charge.status == ChargeStatus.PAID:
+                log_payment_confirmed(charge.user_id, charge.id, "asaas")
+            return {"status": "processed", "charge_id": charge.id}
+        return {"status": "ignored"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing Asaas webhook: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error processing webhook"

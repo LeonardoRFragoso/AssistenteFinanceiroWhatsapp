@@ -10,7 +10,7 @@ import BillingSection from '../components/BillingSection';
 import { reportsAPI, billingAPI, chargesAPI } from '../services/api';
 import { getErrorMessage } from '../utils/errorHandler';
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download, FileText, Search, ChevronLeft, ChevronRight, Activity, Percent, QrCode, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Calendar, Bell, BarChart3, PieChart, Sparkles, Receipt, Link2, Copy, Check, XCircle, Clock, AlertTriangle, DollarSign, Download, FileText, Search, ChevronLeft, ChevronRight, Activity, Percent, QrCode, X, RefreshCw, FileBadge } from 'lucide-react';
 
 interface DashboardData {
   summary: {
@@ -39,11 +39,14 @@ interface Charge {
   customer_phone?: string;
   amount: number;
   description?: string;
+  provider: string;
   status: string;
   derived_status?: string;
   payment_link?: string;
   qr_code?: string;
   qr_code_base64?: string;
+  provider_bank_slip_url?: string;
+  provider_status?: string;
   due_date?: string;
   created_at: string;
   paid_at?: string;
@@ -96,6 +99,7 @@ export default function Dashboard() {
   const [exportingCSV, setExportingCSV] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const [qrModalCharge, setQrModalCharge] = useState<Charge | null>(null);
+  const [syncingId, setSyncingId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -228,6 +232,24 @@ export default function Dashboard() {
       console.error('Error cancelling charge:', err);
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleSyncProviderStatus = async (id: number) => {
+    setSyncingId(id);
+    try {
+      await chargesAPI.syncProviderStatus(id);
+      await loadCharges(chargeFilter, chargePage, searchQuery);
+      const [summaryRes, analyticsRes] = await Promise.all([
+        chargesAPI.getSummary(),
+        chargesAPI.getAnalytics(),
+      ]);
+      setChargeSummary(summaryRes.data);
+      setChargeAnalytics(analyticsRes.data);
+    } catch (err: any) {
+      console.error('Error syncing charge status:', err);
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -752,6 +774,9 @@ export default function Dashboard() {
                             <td className="py-3 px-3">
                               <p className="font-medium text-gray-900 dark:text-gray-100">{c.customer_name}</p>
                               {c.customer_phone && <p className="text-xs text-gray-400 dark:text-gray-500">{c.customer_phone}</p>}
+                              <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${c.provider === 'asaas' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                {c.provider === 'asaas' ? 'Asaas Sandbox' : c.provider || 'fake'}
+                              </span>
                             </td>
                             <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">R$ {Number(c.amount).toFixed(2)}</td>
                             <td className="py-3 px-3 hidden sm:table-cell text-gray-600 dark:text-gray-400 max-w-xs truncate">{c.description || '-'}</td>
@@ -759,6 +784,9 @@ export default function Dashboard() {
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
                                 {statusLabel}
                               </span>
+                              {c.provider_status && c.provider_status !== displayStatus.toUpperCase() && (
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{c.provider_status}</p>
+                              )}
                             </td>
                             <td className="py-3 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400 text-xs">{c.due_date ? new Date(c.due_date + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                             <td className="py-3 px-3 hidden lg:table-cell text-gray-500 dark:text-gray-400 text-xs">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
@@ -780,12 +808,31 @@ export default function Dashboard() {
                                       <button
                                         onClick={() => setQrModalCharge(c)}
                                         className="p-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
-                                        title="Ver QR Code (sandbox)"
+                                        title="Ver QR Code"
                                       >
                                         <QrCode className="w-4 h-4" />
                                       </button>
                                     )}
                                   </>
+                                )}
+                                {c.provider_bank_slip_url && (
+                                  <a href={c.provider_bank_slip_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors" title="Boleto PDF">
+                                    <FileBadge className="w-4 h-4" />
+                                  </a>
+                                )}
+                                {c.provider !== 'fake' && displayStatus !== 'paid' && displayStatus !== 'cancelled' && (
+                                  <button
+                                    onClick={() => handleSyncProviderStatus(c.id)}
+                                    disabled={syncingId === c.id}
+                                    className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg transition-colors disabled:opacity-50"
+                                    title="Sincronizar status"
+                                  >
+                                    {syncingId === c.id ? (
+                                      <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="w-4 h-4" />
+                                    )}
+                                  </button>
                                 )}
                                 {canCancel && (
                                   <button

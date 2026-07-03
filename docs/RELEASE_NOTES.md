@@ -1,5 +1,21 @@
 # PayFlow AI — Release Notes
 
+## Sprint 15: Asaas Sandbox Charge Provider
+
+- **Asaas API v3 integration**: Sandbox mode for Pix, boleto, and payment link charges. Receive-only operations (no Pix Out, no withdrawals).
+- **AsaasClient** (`app/integrations/asaas_client.py`): HTTP client with 30s timeout, retry on 5xx/timeouts, sensitive data sanitization. Methods for customer creation, payment creation, Pix QR code retrieval, payment status, and cancellation.
+- **AsaasPaymentProvider** (`app/providers/asaas_provider.py`): Implements `PaymentProvider` interface. Supports PIX/BOLETO/UNDEFINED billing types. Auto-generates sandbox CPF. Maps Asaas statuses to PayFlow statuses. Parses webhook events. Validates webhook tokens.
+- **Provider factory updated**: Supports `asaas` provider name with validation (demo mode, feature flag, API key). Production rejects unknown providers.
+- **Charge model additions**: `provider_bank_slip_url` (boleto PDF), `provider_status` (raw provider status). `billing_type` field in `ChargeCreate` schema.
+- **Migration**: `l2a3b4c5d6e7` — adds `provider_bank_slip_url` and `provider_status` columns to `charges` table.
+- **Webhook endpoint**: `POST /provider-webhooks/asaas` — validates `asaas-access-token` header, idempotent by `event_id`, rate limited.
+- **Test-connection endpoint**: `POST /providers/asaas/test-connection` — validates config without API calls. RBAC: owner/admin.
+- **Sync endpoint**: `POST /charges/{id}/sync-provider-status` — manual reconciliation via provider API. Read-only. RBAC: manage_charges.
+- **WhatsApp integration**: `PendingActionService` passes `billing_type` to charge creation. Uses active provider automatically.
+- **Frontend**: Provider badge per charge, sync button, boleto PDF link, provider status display.
+- **Tests**: 39 new tests across 4 files (config, provider, client, webhook). Total: 473 backend tests, 0 failures.
+- **Security**: API key never logged, webhook token validation, idempotency, demo mode blocks Asaas, feature flag defaults false, production rejects unknown providers.
+
 ## Sprint 14: Provider Foundation, Consent, Audit Logs & Transaction Auth
 
 - **5 new tables**: `provider_connections`, `provider_webhook_events`, `open_finance_consents`, `organization_audit_logs`, `transaction_authorizations` — all org-scoped with proper indexes.

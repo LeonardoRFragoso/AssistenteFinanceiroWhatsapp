@@ -1,5 +1,21 @@
 # Security Hardening — PayFlow AI
 
+## Asaas Sandbox Provider Security (Sprint 15)
+
+- **API key never logged**: `AsaasClient` sends API key via `access_token` header only. All log statements sanitize sensitive keys before output.
+- **Webhook token validation**: `asaas-access-token` header validated against `ASAAS_WEBHOOK_TOKEN` env var. Missing or mismatched tokens are rejected with 401.
+- **Webhook idempotency**: Duplicate Asaas events are detected by `event_id` and skipped, preventing double-processing.
+- **Feature flag enforcement**: `ENABLE_ASAAS_CHARGE_PROVIDER` defaults to `false`. Provider factory raises `RuntimeError` if Asaas is requested without flag or API key.
+- **Demo mode blocks Asaas**: If `ENABLE_DEMO_MODE=true`, Asaas provider cannot be instantiated. Prevents accidental real charges in demo environments.
+- **Production safety**: Unknown provider names raise `RuntimeError` in production — no silent fallback to fake.
+- **Sandbox CPF generation**: In sandbox, valid-format CPFs are generated for customer creation. No real CPF/CNPJ is used or stored.
+- **Timeout and retry**: All Asaas API calls have 30s timeout. Retries only on 5xx and timeouts (safe retries), never on 4xx.
+- **No Pix Out / no withdrawals**: Only receive-only operations (create charge, get status, cancel). No money movement out.
+- **RBAC on sync endpoint**: `POST /charges/{id}/sync-provider-status` requires `manage_charges` permission.
+- **RBAC on test-connection**: `POST /providers/asaas/test-connection` restricted to owner/admin.
+- **Sanitization in AsaasClient**: `_sanitize_for_log` redacts `access_token`, `api_key`, `token`, `secret`, `password`, `authorization`, `credential`, `client_secret` from any logged data.
+- **Read-only reconciliation**: `sync_provider_status` only reads provider API and updates local status. Does NOT execute payments.
+
 ## Provider Foundation Security (Sprint 14)
 
 - **No secrets in plaintext**: `secret_ref` field in `provider_connections` stores only external references, never actual secrets, tokens, or credentials.
