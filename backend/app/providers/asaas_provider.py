@@ -123,7 +123,10 @@ class AsaasPaymentProvider(PaymentProvider):
                 mobile_phone=customer_phone,
                 external_reference=external_reference,
             )
-            customer_id = customer["id"]
+            customer_id = customer.get("id")
+            if not customer_id:
+                logger.error(f"Asaas create_customer returned no id: {customer}")
+                raise RuntimeError("Asaas API returned customer without id")
 
             payment = await self._client.create_payment(
                 customer_id=customer_id,
@@ -134,7 +137,10 @@ class AsaasPaymentProvider(PaymentProvider):
                 external_reference=external_reference,
             )
 
-            payment_id = payment["id"]
+            payment_id = payment.get("id")
+            if not payment_id:
+                logger.error(f"Asaas create_payment returned no id: {payment}")
+                raise RuntimeError("Asaas API returned payment without id")
             invoice_url = payment.get("invoiceUrl")
             bank_slip_url = payment.get("bankSlipUrl")
             provider_status = payment.get("status", "PENDING")
@@ -243,7 +249,7 @@ class AsaasPaymentProvider(PaymentProvider):
             "amount": Decimal(str(payment_obj["value"])) if isinstance(payment_obj, dict) and payment_obj.get("value") else None,
             "status": status,
             "paid_at": paid_at,
-            "raw_data": payload,
+            "raw_data": _sanitize_webhook_payload(payload),
         }
 
     def validate_webhook(self, headers: Dict[str, str], payload: Dict[str, Any]) -> bool:
@@ -255,3 +261,9 @@ class AsaasPaymentProvider(PaymentProvider):
             logger.warning("ASAAS_WEBHOOK_TOKEN not configured — rejecting webhook")
             return False
         return token == settings.ASAAS_WEBHOOK_TOKEN
+
+
+def _sanitize_webhook_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Sanitize webhook payload before storage — remove sensitive keys."""
+    from app.integrations.asaas_client import _sanitize_for_log
+    return _sanitize_for_log(payload)

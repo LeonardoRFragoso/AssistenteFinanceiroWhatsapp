@@ -191,6 +191,10 @@ class ChargeService:
             logger.info(f"Charge {charge.id} already paid, ignoring duplicate event")
             return charge
 
+        if charge.status == ChargeStatus.CANCELLED:
+            logger.info(f"Charge {charge.id} already cancelled, ignoring event")
+            return charge
+
         if status == "paid" or status == "approved":
             charge.status = ChargeStatus.PAID
             charge.paid_at = paid_at or datetime.now(timezone.utc)
@@ -295,7 +299,12 @@ class ChargeService:
             logger.warning(f"Charge {charge.id} has no provider_charge_id, cannot sync")
             return charge
 
-        result = await provider.get_charge(charge.provider_charge_id)
+        try:
+            result = await provider.get_charge(charge.provider_charge_id)
+        except RuntimeError as e:
+            logger.warning(f"Provider error during sync for charge {charge.id}: {e}")
+            return charge
+
         if not result:
             return charge
 
