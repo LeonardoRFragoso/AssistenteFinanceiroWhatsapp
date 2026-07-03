@@ -442,6 +442,25 @@ async def process_intent(
         elif intent == "open_finance_search_transactions":
             return await handle_of_search_transactions(user_id, entities, db, ai_service, context)
 
+        elif intent == "list_due_bills":
+            return await handle_list_due_bills(user_id, entities, db, ai_service, context)
+        elif intent == "list_overdue_bills":
+            return await handle_list_overdue_bills(user_id, entities, db, ai_service, context)
+        elif intent == "list_bills_due_today":
+            return await handle_list_bills_due_today(user_id, entities, db, ai_service, context)
+        elif intent == "bill_summary":
+            return await handle_bill_summary(user_id, entities, db, ai_service, context)
+        elif intent == "search_bills":
+            return await handle_search_bills(user_id, entities, db, ai_service, context)
+        elif intent == "create_bill_reminder":
+            return await handle_create_bill_reminder(user_id, entities, db, ai_service, context)
+        elif intent == "prepare_fake_bill_payment":
+            return await handle_prepare_fake_bill_payment(user_id, entities, db, ai_service, context)
+        elif intent == "mark_bill_paid_manual":
+            return await handle_mark_bill_paid_manual(user_id, entities, db, ai_service, context)
+        elif intent == "ignore_bill":
+            return await handle_ignore_bill(user_id, entities, db, ai_service, context)
+
         else:
             return await handle_help(ai_service, context)
     
@@ -1961,3 +1980,277 @@ async def handle_of_search_transactions(
     except Exception as e:
         logger.error(f"Error in OF search transactions: {str(e)}")
         return "Erro ao buscar transações. Tente novamente."
+
+
+# ---------------------------------------------------------------------------
+# Bill management WhatsApp handlers — Sprint 17 (fake/demo)
+# ---------------------------------------------------------------------------
+
+async def handle_list_due_bills(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'quais contas vencem hoje?' — list due bills."""
+    try:
+        from app.services.bill_summary_service import BillSummaryService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BillSummaryService(db)
+        bills = await service.get_due_today(org_id)
+
+        if not bills:
+            return "✅ [Dados de demonstração] Nenhuma conta vence hoje."
+
+        message = "📅 *Contas que vencem hoje*\n"
+        message += "⚠️ _Dados de demonstração._\n\n"
+        for i, bill in enumerate(bills, 1):
+            message += f"{i}. {bill.title}\n   💰 R$ {float(bill.amount):.2f}\n   🏢 {bill.beneficiary_name}\n"
+        return message
+    except Exception as e:
+        logger.error(f"Error in list_due_bills: {str(e)}")
+        return "Erro ao listar contas. Tente novamente."
+
+
+async def handle_list_overdue_bills(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'tenho boletos vencidos?' — list overdue bills."""
+    try:
+        from app.services.bill_summary_service import BillSummaryService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BillSummaryService(db)
+        bills = await service.get_overdue(org_id)
+
+        if not bills:
+            return "✅ [Dados de demonstração] Nenhuma conta vencida encontrada."
+
+        message = "🔴 *Contas vencidas*\n"
+        message += "⚠️ _Dados de demonstração._\n\n"
+        for i, bill in enumerate(bills, 1):
+            message += f"{i}. {bill.title}\n   💰 R$ {float(bill.amount):.2f}\n   📅 Vencimento: {bill.due_date.strftime('%d/%m/%Y')}\n   🏢 {bill.beneficiary_name}\n"
+        return message
+    except Exception as e:
+        logger.error(f"Error in list_overdue_bills: {str(e)}")
+        return "Erro ao listar contas vencidas. Tente novamente."
+
+
+async def handle_list_bills_due_today(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'mostre minhas contas da semana' — list upcoming bills."""
+    try:
+        from app.services.bill_summary_service import BillSummaryService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BillSummaryService(db)
+
+        days = int(entities.get("days", 7))
+        bills = await service.get_upcoming(org_id, days)
+
+        if not bills:
+            return f"✅ [Dados de demonstração] Nenhuma conta nos próximos {days} dias."
+
+        message = f"📅 *Próximos {days} dias*\n"
+        message += "⚠️ _Dados de demonstração._\n\n"
+        for i, bill in enumerate(bills, 1):
+            message += f"{i}. {bill.title}\n   💰 R$ {float(bill.amount):.2f}\n   📅 {bill.due_date.strftime('%d/%m/%Y')}\n   🏢 {bill.beneficiary_name}\n"
+        return message
+    except Exception as e:
+        logger.error(f"Error in list_bills_due_today: {str(e)}")
+        return "Erro ao listar contas. Tente novamente."
+
+
+async def handle_bill_summary(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'quanto tenho para pagar este mês?' — bill summary."""
+    try:
+        from app.services.bill_summary_service import BillSummaryService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BillSummaryService(db)
+        summary = await service.get_summary(org_id)
+
+        message = "📊 *Resumo de Contas a Pagar*\n"
+        message += "⚠️ _Dados de demonstração._\n\n"
+        message += f"🔴 Vencidas: R$ {float(summary['overdue_total']):.2f} ({summary['overdue_count']} contas)\n"
+        message += f"📅 Vencem hoje: R$ {float(summary['due_today_total']):.2f} ({summary['due_today_count']} contas)\n"
+        message += f"📆 Próximos 7 dias: R$ {float(summary['upcoming_7_days_total']):.2f} ({summary['upcoming_7_days_count']} contas)\n"
+        message += f"📆 Próximos 30 dias: R$ {float(summary['upcoming_30_days_total']):.2f} ({summary['upcoming_30_days_count']} contas)\n"
+        message += f"\n💰 *Total em aberto: R$ {float(summary['open_total']):.2f}*"
+
+        if summary.get("top_categories"):
+            message += "\n\n📋 *Top categorias:*"
+            for cat in summary["top_categories"][:3]:
+                message += f"\n  • {cat['category']}: R$ {float(cat['total']):.2f}"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in bill_summary: {str(e)}")
+        return "Erro ao gerar resumo. Tente novamente."
+
+
+async def handle_search_bills(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle search for bills by text."""
+    try:
+        from app.services.bill_service import BillService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BillService(db)
+
+        search_term = entities.get("search_term") or entities.get("query") or ""
+        if not search_term:
+            return "🔍 Qual termo você quer buscar nas contas?"
+
+        bills = await service.list_bills(org_id, search=search_term, limit=10)
+
+        if not bills:
+            return f"⚠️ [Dados de demonstração] Nenhuma conta encontrada para \"{search_term}\"."
+
+        message = f"🔍 *Busca: \"{search_term}\"*\n\n"
+        message += "⚠️ _Dados de demonstração._\n\n"
+        for i, bill in enumerate(bills, 1):
+            message += f"{i}. {bill.title}\n   💰 R$ {float(bill.amount):.2f}\n   📅 {bill.due_date.strftime('%d/%m/%Y')}\n   📊 {bill.status.value}\n"
+        return message
+    except Exception as e:
+        logger.error(f"Error in search_bills: {str(e)}")
+        return "Erro ao buscar contas. Tente novamente."
+
+
+async def handle_create_bill_reminder(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'me lembre do boleto da Light amanhã' — create bill reminder."""
+    try:
+        from app.services.bill_service import BillService
+        from app.services.bill_reminder_service import BillReminderService
+        from datetime import date as dt_date, timedelta
+        org_id = await _get_org_id_for_user(db, user_id)
+        bill_service = BillService(db)
+        reminder_service = BillReminderService(db)
+
+        search_term = entities.get("beneficiary") or entities.get("search_term") or ""
+        if not search_term:
+            return "🔍 Para qual conta você quer criar um lembrete? Diga o nome do beneficiário."
+
+        bills = await bill_service.list_bills(org_id, search=search_term, limit=1)
+        if not bills:
+            return f"⚠️ [Dados de demonstração] Nenhuma conta encontrada para \"{search_term}\"."
+
+        bill = bills[0]
+        days_ahead = int(entities.get("days_ahead", 1))
+        reminder_date = dt_date.today() + timedelta(days=days_ahead)
+
+        reminder = await reminder_service.schedule_reminder(org_id, bill.id, reminder_date)
+        if not reminder:
+            return "Erro ao criar lembrete."
+
+        message = f"✅ *Lembrete criado!*\n"
+        message += f"⚠️ _Dados de demonstração._\n\n"
+        message += f"📋 Conta: {bill.title}\n"
+        message += f"📅 Lembrete para: {reminder_date.strftime('%d/%m/%Y')}\n"
+        message += f"💰 Valor: R$ {float(bill.amount):.2f}\n"
+        message += f"📅 Vencimento: {bill.due_date.strftime('%d/%m/%Y')}"
+        return message
+    except Exception as e:
+        logger.error(f"Error in create_bill_reminder: {str(e)}")
+        return "Erro ao criar lembrete. Tente novamente."
+
+
+async def handle_prepare_fake_bill_payment(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'preparar pagamento do boleto da Vivo' — fake payment intent."""
+    try:
+        from app.services.bill_service import BillService
+        from app.services.bill_payment_intent_service import BillPaymentIntentService
+        org_id = await _get_org_id_for_user(db, user_id)
+        bill_service = BillService(db)
+        intent_service = BillPaymentIntentService(db)
+
+        search_term = entities.get("beneficiary") or entities.get("search_term") or ""
+        if not search_term:
+            return "🔍 Para qual conta você quer preparar o pagamento? Diga o nome do beneficiário."
+
+        bills = await bill_service.list_bills(org_id, search=search_term, limit=1)
+        if not bills:
+            return f"⚠️ [Dados de demonstração] Nenhuma conta encontrada para \"{search_term}\"."
+
+        bill = bills[0]
+        intent = await intent_service.create_fake_payment_intent(org_id, bill.id, user_id)
+        if not intent:
+            return "Erro ao criar intenção de pagamento."
+
+        message = f"🧾 *Intenção de pagamento fake preparada*\n"
+        message += f"⚠️ _Dados de demonstração. Nenhum pagamento real será executado._\n\n"
+        message += f"📋 Conta: {bill.title}\n"
+        message += f"💰 Valor: R$ {float(bill.amount):.2f}\n"
+        message += f"🏢 {bill.beneficiary_name}\n"
+        message += f"📅 Vencimento: {bill.due_date.strftime('%d/%m/%Y')}\n"
+        message += f"🔑 Referência fake: {intent.fake_payment_reference}\n\n"
+        message += f"Para autorizar (fake), use o código de autorização."
+        return message
+    except Exception as e:
+        logger.error(f"Error in prepare_fake_bill_payment: {str(e)}")
+        return "Erro ao preparar intenção. Tente novamente."
+
+
+async def handle_mark_bill_paid_manual(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'marcar a conta da internet como paga' — mark paid manual."""
+    try:
+        from app.services.bill_service import BillService
+        org_id = await _get_org_id_for_user(db, user_id)
+        bill_service = BillService(db)
+
+        search_term = entities.get("beneficiary") or entities.get("search_term") or ""
+        if not search_term:
+            return "🔍 Qual conta você quer marcar como paga? Diga o nome do beneficiário."
+
+        bills = await bill_service.list_bills(org_id, search=search_term, limit=1)
+        if not bills:
+            return f"⚠️ [Dados de demonstração] Nenhuma conta encontrada para \"{search_term}\"."
+
+        bill = bills[0]
+        updated = await bill_service.mark_paid_manual(org_id, bill.id, user_id)
+        if not updated:
+            return "Erro ao marcar conta como paga."
+
+        message = f"✅ *Conta marcada como paga (manual)*\n"
+        message += f"⚠️ _Dados de demonstração. Nenhum pagamento real foi executado._\n\n"
+        message += f"📋 {bill.title}\n"
+        message += f"💰 R$ {float(bill.amount):.2f}"
+        return message
+    except Exception as e:
+        logger.error(f"Error in mark_bill_paid_manual: {str(e)}")
+        return "Erro ao marcar conta. Tente novamente."
+
+
+async def handle_ignore_bill(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'ignorar esse boleto' — ignore bill."""
+    try:
+        from app.services.bill_service import BillService
+        org_id = await _get_org_id_for_user(db, user_id)
+        bill_service = BillService(db)
+
+        search_term = entities.get("beneficiary") or entities.get("search_term") or ""
+        if not search_term:
+            return "🔍 Qual conta você quer ignorar? Diga o nome do beneficiário."
+
+        bills = await bill_service.list_bills(org_id, search=search_term, limit=1)
+        if not bills:
+            return f"⚠️ [Dados de demonstração] Nenhuma conta encontrada para \"{search_term}\"."
+
+        bill = bills[0]
+        updated = await bill_service.ignore_bill(org_id, bill.id, user_id)
+        if not updated:
+            return "Erro ao ignorar conta."
+
+        message = f"🚫 *Conta ignorada*\n"
+        message += f"⚠️ _Dados de demonstração._\n\n"
+        message += f"📋 {bill.title}\n"
+        message += f"💰 R$ {float(bill.amount):.2f}"
+        return message
+    except Exception as e:
+        logger.error(f"Error in ignore_bill: {str(e)}")
+        return "Erro ao ignorar conta. Tente novamente."

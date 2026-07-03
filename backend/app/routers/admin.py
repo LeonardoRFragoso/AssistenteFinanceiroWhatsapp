@@ -691,6 +691,53 @@ async def get_billing_metrics(
             "sync_logs_by_status": of_sync_logs_by_status,
         }
 
+        # Bill management metrics — Sprint 17
+        from app.models.bills import (
+            DetectedBill, BillReminder, BillPaymentIntent, BillEventLog,
+            BillStatus, BillReminderStatus, PaymentIntentStatus,
+        )
+        bills_total = (await db.execute(
+            select(func.count(DetectedBill.id))
+        )).scalar()
+        bills_overdue = (await db.execute(
+            select(func.count(DetectedBill.id)).where(
+                DetectedBill.status == BillStatus.OVERDUE
+            )
+        )).scalar()
+        bills_due_today = (await db.execute(
+            select(func.count(DetectedBill.id)).where(
+                DetectedBill.status == BillStatus.DUE_TODAY
+            )
+        )).scalar()
+        fake_payment_intents_by_status = {}
+        for s in PaymentIntentStatus:
+            c = (await db.execute(
+                select(func.count(BillPaymentIntent.id)).where(
+                    BillPaymentIntent.status == s
+                )
+            )).scalar()
+            fake_payment_intents_by_status[s.value] = c
+        reminders_by_status = {}
+        for s in BillReminderStatus:
+            c = (await db.execute(
+                select(func.count(BillReminder.id)).where(
+                    BillReminder.status == s
+                )
+            )).scalar()
+            reminders_by_status[s.value] = c
+        bill_event_logs_total = (await db.execute(
+            select(func.count(BillEventLog.id))
+        )).scalar()
+
+        bill_metrics = {
+            "detected_bills_total": bills_total,
+            "bills_overdue": bills_overdue,
+            "bills_due_today": bills_due_today,
+            "fake_payment_intents_by_status": fake_payment_intents_by_status,
+            "reminders_by_status": reminders_by_status,
+            "bill_event_logs_total": bill_event_logs_total,
+        }
+
         return {
             "subscriptions_by_status": status_counts,
             "organizations_by_plan": orgs_by_plan,
@@ -708,6 +755,12 @@ async def get_billing_metrics(
             "open_finance_bank_transactions_total": open_finance_metrics["bank_transactions_total"],
             "open_finance_bank_transactions_demo": open_finance_metrics["bank_transactions_demo"],
             "open_finance_sync_logs_by_status": open_finance_metrics["sync_logs_by_status"],
+            "detected_bills_total": bill_metrics["detected_bills_total"],
+            "bills_overdue": bill_metrics["bills_overdue"],
+            "bills_due_today": bill_metrics["bills_due_today"],
+            "fake_payment_intents_by_status": bill_metrics["fake_payment_intents_by_status"],
+            "bill_reminders_by_status": bill_metrics["reminders_by_status"],
+            "bill_event_logs_total": bill_metrics["bill_event_logs_total"],
         }
 
     except Exception as e:

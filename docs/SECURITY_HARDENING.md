@@ -1,5 +1,22 @@
 # Security Hardening — PayFlow AI
 
+## Fake DDA & Bill Payment Security (Sprint 17)
+
+- **Feature flag defaults false**: `ENABLE_DDA=false`, `ENABLE_BILL_PAYMENT=false` — no DDA or bill payment functionality active unless explicitly enabled.
+- **Provider defaults fake**: `DDA_PROVIDER_NAME=fake`, `BILL_PAYMENT_PROVIDER_NAME=fake` — only fake/demo data generated. No real API calls.
+- **Demo mode forces fake**: When `ENABLE_DEMO_MODE=true`, DDA and bill payment providers are always fake regardless of config.
+- **No real DDA access**: `FakeDDAProvider` generates all bills locally. No HTTP requests to Celcoin, Dock, QI Tech, or any external service.
+- **No real payment execution**: "Prepare payment" creates a `BillPaymentIntent` with status `draft`. "Authorize" changes status to `authorized_fake`. No money is moved, no real payment API is called.
+- **No real bank credentials stored**: No bank account numbers, no real barcodes, no real digitable lines.
+- **All data marked demo**: `is_demo_data=True` on all `DetectedBill` records for transparency.
+- **WhatsApp demo disclaimer**: All bill-related WhatsApp responses include "Dados de demonstração" or "Demo" text. "Prepare payment" explicitly states "Nenhum pagamento real será executado".
+- **Transaction authorization is fake only**: `TransactionAuthorization` created for fake intents only. Does not authorize real payment.
+- **Org-scoped data**: All 4 bill tables have `organization_id` foreign key. All queries filter by org. Multi-tenant audit script includes new tables.
+- **RBAC enforcement**: All bill endpoints require owner/admin/finance role. Viewer role gets 403.
+- **Audit logging**: All bill actions logged in `bill_event_logs` and via `OrganizationAuditService`.
+- **Unique constraints**: `detected_bills` has unique constraint on `(organization_id, provider_name, provider_bill_id)` to prevent duplicates.
+- **Event trail**: Every action (detect, ignore, mark-paid, reminder, intent create/authorize/cancel) is logged with actor, timestamp, and sanitized metadata.
+
 ## Open Finance Read Provider Security (Sprint 16)
 
 - **Feature flag defaults false**: `ENABLE_OPEN_FINANCE=false` — no Open Finance functionality active unless explicitly enabled.
