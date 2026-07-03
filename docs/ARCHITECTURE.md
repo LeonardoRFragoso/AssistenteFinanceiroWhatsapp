@@ -33,7 +33,7 @@ backend/
 │   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, providers, etc.)
 │   ├── providers/      # Payment providers (fake, mercado_pago, asaas) — Sprint 15
 │   ├── billing_providers/  # SaaS billing providers (base, fake, factory)
-│   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory, open_finance_fake) — Sprint 13/16
+│   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory, open_finance_fake, dda_fake) — Sprint 13/16/17
 │   ├── integrations/   # External integrations (Twilio, AsaasClient) — Sprint 15
 │   ├── jobs/           # Background jobs (reminder_scheduler)
 │   └── utils/          # Dependencies, middleware
@@ -458,3 +458,43 @@ See: `docs/SPRINT_15_ASAAS_SANDBOX_PROVIDER.md`
 - Audit logging for all operations
 
 See: `docs/SPRINT_16_OPEN_FINANCE_FOUNDATION.md`
+
+## Sprint 17: Fake DDA & Bill Management
+
+**Models:** `backend/app/models/bills.py`
+- `DetectedBill` — fake boleto/bill with beneficiary, amount, due date, barcode, status
+- `BillReminder` — scheduled reminders (WhatsApp, email, push)
+- `BillPaymentIntent` — fake payment intent (no execution)
+- `BillEventLog` — audit trail for all bill actions
+
+**Migration:** `n3c4d5e6f7g8` — creates 4 new tables
+
+**Provider:** `backend/app/regulated_providers/dda_fake.py`
+- `FakeDDAProvider` — generates 8-15 deterministic demo bills per org
+
+**Services:**
+- `BillService` — sync, list, get, ignore, mark-paid-manual, event logs
+- `BillReminderService` — schedule, list, cancel reminders
+- `BillPaymentIntentService` — create, authorize (fake), cancel, expire intents
+- `BillSummaryService` — summary, due-today, overdue, upcoming
+
+**Router:** `backend/app/routers/bills.py` — 17 endpoints with RBAC
+
+**WhatsApp intents:**
+- `list_due_bills`, `list_overdue_bills`, `list_bills_due_today`
+- `bill_summary`, `search_bills`
+- `create_bill_reminder`, `prepare_fake_bill_payment`
+- `mark_bill_paid_manual`, `ignore_bill`
+
+**Frontend:** `frontend/components/BillsSection.tsx`
+
+**Security:**
+- `ENABLE_DDA` defaults false
+- `ENABLE_BILL_PAYMENT` defaults false
+- `DDA_PROVIDER_NAME` defaults "fake"
+- No real payment execution, no real DDA access
+- All data org-scoped with RBAC
+- All responses include demo/fake disclaimers
+- Audit logging for all operations
+
+See: `docs/SPRINT_17_DDA_BILL_MANAGEMENT.md`, `docs/FAKE_DDA_BILL_PAYMENT_SECURITY.md`

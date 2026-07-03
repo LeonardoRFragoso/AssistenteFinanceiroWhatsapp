@@ -22,6 +22,9 @@ from app.models.provider_foundation import (
 from app.models.open_finance import (
     ConnectedAccount, BankTransaction, FinancialCategory, OpenFinanceSyncLog,
 )
+from app.models.bills import (
+    DetectedBill, BillReminder, BillPaymentIntent, BillEventLog,
+)
 from datetime import datetime, timezone
 
 

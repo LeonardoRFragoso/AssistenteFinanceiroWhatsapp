@@ -39,6 +39,10 @@ ORG_SCOPED_TABLES = [
     "bank_transactions",
     "financial_categories",
     "open_finance_sync_logs",
+    "detected_bills",
+    "bill_reminders",
+    "bill_payment_intents",
+    "bill_event_logs",
 ]
 
 

@@ -1,5 +1,19 @@
 # PayFlow AI — Release Notes
 
+## Sprint 17: Fake DDA, Contas a Pagar e Bill Management
+
+- **Fake DDA provider**: `FakeDDAProvider` generates 8-15 deterministic demo bills per organization with varied due dates, amounts, beneficiaries, categories, and statuses. No real DDA access. All data marked `is_demo_data=True`.
+- **4 new models**: `DetectedBill`, `BillReminder`, `BillPaymentIntent`, `BillEventLog` — all org-scoped with proper indexes, unique constraints, and event logging.
+- **Migration**: `n3c4d5e6f7g8` — creates 4 new tables. Compatible with SQLite and PostgreSQL.
+- **4 services**: `BillService`, `BillReminderService`, `BillPaymentIntentService`, `BillSummaryService` — manage sync, listing, filtering, reminders, fake payment intents, and summaries.
+- **17 API endpoints**: Status, sync, list, summary, due-today, overdue, upcoming, get, ignore, mark-paid-manual, reminders (create/list/cancel), payment intents (create/authorize-fake/cancel), events. All org-scoped with RBAC.
+- **9 WhatsApp intents**: list_due_bills, list_overdue_bills, list_bills_due_today, bill_summary, search_bills, create_bill_reminder, prepare_fake_bill_payment, mark_bill_paid_manual, ignore_bill. All with demo disclaimers.
+- **Frontend**: `BillsSection.tsx` with summary cards, bill list, filters, action buttons, and "Demo/Fake" badge.
+- **Admin metrics**: Bill counts, fake payment intents by status, reminders by status, event logs total.
+- **Security**: No real payment execution, no real DDA, no real bank credentials. Feature flags `ENABLE_DDA` and `ENABLE_BILL_PAYMENT` remain `false` by default.
+- **Tests**: 70 new tests across 5 files (models, service, router, WhatsApp, payment intents). Total: 629 backend tests, 0 failures.
+- **Audit**: 4 new tables added to multi-tenant integrity audit script.
+
 ## Sprint 16.1: Test Suite Stabilization, Count Consistency & Open Finance Readiness
 
 - **Fixed `test_asaas_config_defaults` failure**: Root cause was shell environment variables (`ASAAS_ENVIRONMENT=production`) overriding pydantic defaults. Fix: `monkeypatch.delenv` for all Asaas env keys + `_env_file=None` to isolate test Settings instances from both `.env` file and shell env vars.

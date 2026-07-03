@@ -27,6 +27,12 @@ from app.models.open_finance import (
     ConnectedAccountStatus, TransactionType, TransactionStatus,
     SyncType, SyncStatus, CategoryType,
 )
+from app.models.bills import (
+    DetectedBill, BillReminder, BillPaymentIntent, BillEventLog,
+    BillStatus, BillSource, BillType, BillRiskLevel,
+    BillReminderStatus, BillReminderChannel,
+    PaymentIntentStatus, PaymentIntentType, BillEventAction,
+)
 
 __all__ = [
     "User",
@@ -78,4 +84,17 @@ __all__ = [
     "SyncType",
     "SyncStatus",
     "CategoryType",
+    "DetectedBill",
+    "BillReminder",
+    "BillPaymentIntent",
+    "BillEventLog",
+    "BillStatus",
+    "BillSource",
+    "BillType",
+    "BillRiskLevel",
+    "BillReminderStatus",
+    "BillReminderChannel",
+    "PaymentIntentStatus",
+    "PaymentIntentType",
+    "BillEventAction",
 ]
