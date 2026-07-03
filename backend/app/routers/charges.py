@@ -18,6 +18,7 @@ from app.services.charge_reminder_service import ChargeReminderService
 from app.utils.dependencies import get_current_active_user, get_current_organization, get_current_user_role
 from app.utils.user_rate_limiter import charges_limiter, exports_limiter
 from app.core.audit_logger import log_charge_created, log_export
+from app.core.logging import logger
 from app.core.permissions import require_permission, has_permission
 from app.services.entitlements_service import EntitlementsService
 from app.services.saas_billing_service import SaaSBillingService
@@ -437,7 +438,14 @@ async def create_charge(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=entitlement,
         )
-    charge = await service.create_charge(current_user.id, charge_data, organization_id=org.id)
+    try:
+        charge = await service.create_charge(current_user.id, charge_data, organization_id=org.id)
+    except RuntimeError as e:
+        logger.error(f"Charge creation failed for user {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Payment provider error: {e}",
+        )
     log_charge_created(current_user.id, charge.id, charge.provider, str(charge.amount))
     await SaaSBillingService(db).increment_usage(org.id, "charges_created")
     return charge
@@ -510,7 +518,7 @@ async def sync_provider_status(
     Calls the provider's API to get the current payment status and updates
     the local charge record. Does NOT execute any payment.
 
-    RBAC: owner/admin/finance only.
+    RBAC: owner/admin/finance only (manage_charges).
     """
     if not has_permission(role, "manage_charges"):
         raise HTTPException(
@@ -518,12 +526,20 @@ async def sync_provider_status(
             detail="Your role does not allow syncing charge status",
         )
     service = ChargeService(db)
-    charge = await service.sync_provider_status(
-        charge_id, current_user.id, organization_id=org.id
-    )
+    try:
+        charge = await service.sync_provider_status(
+            charge_id, current_user.id, organization_id=org.id
+        )
+    except RuntimeError as e:
+        logger.warning(f"Sync failed for charge {charge_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Provider error during sync: {e}",
+        )
     if not charge:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Charge not found"
         )
+    logger.info(f"User {current_user.id} synced charge {charge_id} status={charge.status}")
     return charge

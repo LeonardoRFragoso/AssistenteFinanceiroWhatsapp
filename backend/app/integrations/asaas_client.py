@@ -68,6 +68,13 @@ class AsaasClient:
                 status_code=401,
             )
 
+        if settings.ENVIRONMENT == "production" and "sandbox.asaas.com" in self._base_url:
+            raise AsaasApiError(
+                "Asaas sandbox URL detected in production environment. "
+                "Set ASAAS_API_BASE_URL to the production endpoint.",
+                status_code=500,
+            )
+
     @property
     def _headers(self) -> Dict[str, str]:
         return {
@@ -128,7 +135,16 @@ class AsaasClient:
                             detail=detail,
                         )
 
-                    return resp.json()
+                    try:
+                        return resp.json()
+                    except Exception as json_err:
+                        logger.error(
+                            f"Asaas API {method} {path} returned invalid JSON: {json_err}"
+                        )
+                        raise AsaasApiError(
+                            f"Asaas API returned invalid JSON for {method} {path}",
+                            status_code=resp.status_code,
+                        )
 
             except httpx.TimeoutException:
                 logger.warning(

@@ -100,6 +100,7 @@ export default function Dashboard() {
   const [exportingPDF, setExportingPDF] = useState(false);
   const [qrModalCharge, setQrModalCharge] = useState<Charge | null>(null);
   const [syncingId, setSyncingId] = useState<number | null>(null);
+  const [syncErrorId, setSyncErrorId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -237,6 +238,7 @@ export default function Dashboard() {
 
   const handleSyncProviderStatus = async (id: number) => {
     setSyncingId(id);
+    setSyncErrorId(null);
     try {
       await chargesAPI.syncProviderStatus(id);
       await loadCharges(chargeFilter, chargePage, searchQuery);
@@ -248,6 +250,8 @@ export default function Dashboard() {
       setChargeAnalytics(analyticsRes.data);
     } catch (err: any) {
       console.error('Error syncing charge status:', err);
+      setSyncErrorId(id);
+      setTimeout(() => setSyncErrorId(null), 5000);
     } finally {
       setSyncingId(null);
     }
@@ -770,11 +774,11 @@ export default function Dashboard() {
                         const statusColor = statusColorMap[displayStatus] || statusColorMap['pending'];
                         const canCancel = displayStatus === 'pending' || displayStatus === 'overdue';
                         return (
-                          <tr key={c.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                          <tr key={c.id} data-testid={`charge-row-${c.id}`} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                             <td className="py-3 px-3">
                               <p className="font-medium text-gray-900 dark:text-gray-100">{c.customer_name}</p>
                               {c.customer_phone && <p className="text-xs text-gray-400 dark:text-gray-500">{c.customer_phone}</p>}
-                              <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${c.provider === 'asaas' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                              <span data-testid={`charge-provider-${c.id}`} className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${c.provider === 'asaas' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                                 {c.provider === 'asaas' ? 'Asaas Sandbox' : c.provider || 'fake'}
                               </span>
                             </td>
@@ -786,6 +790,9 @@ export default function Dashboard() {
                               </span>
                               {c.provider_status && c.provider_status !== displayStatus.toUpperCase() && (
                                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{c.provider_status}</p>
+                              )}
+                              {syncErrorId === c.id && (
+                                <p className="text-[10px] text-red-500 mt-0.5" data-testid={`sync-error-${c.id}`}>Erro ao sincronizar</p>
                               )}
                             </td>
                             <td className="py-3 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400 text-xs">{c.due_date ? new Date(c.due_date + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
@@ -816,7 +823,7 @@ export default function Dashboard() {
                                   </>
                                 )}
                                 {c.provider_bank_slip_url && (
-                                  <a href={c.provider_bank_slip_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors" title="Boleto PDF">
+                                  <a href={c.provider_bank_slip_url} target="_blank" rel="noopener noreferrer" data-testid={`charge-boleto-${c.id}`} className="p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors" title="Boleto PDF">
                                     <FileBadge className="w-4 h-4" />
                                   </a>
                                 )}
@@ -824,6 +831,7 @@ export default function Dashboard() {
                                   <button
                                     onClick={() => handleSyncProviderStatus(c.id)}
                                     disabled={syncingId === c.id}
+                                    data-testid={`charge-sync-${c.id}`}
                                     className="p-1.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-lg transition-colors disabled:opacity-50"
                                     title="Sincronizar status"
                                   >

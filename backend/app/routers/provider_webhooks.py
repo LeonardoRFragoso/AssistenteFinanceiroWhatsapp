@@ -197,7 +197,7 @@ async def asaas_webhook(
     - Validates asaas-access-token header against ASAAS_WEBHOOK_TOKEN
     - Idempotent: duplicate events are not re-processed
     - Rate limited per IP
-    - No sensitive payload data is logged
+    - No sensitive payload data is logged or stored
     """
     await webhook_rate_limiter.check(request, "asaas")
 
@@ -221,37 +221,44 @@ async def asaas_webhook(
         payment_obj = body.get("payment", {})
         payment_id = payment_obj.get("id") if isinstance(payment_obj, dict) else None
 
-        if event_id:
-            existing = await db.execute(
-                select(ProviderEvent).where(
-                    ProviderEvent.provider == "asaas",
-                    ProviderEvent.external_id == str(event_id),
-                    ProviderEvent.processed == True
-                ).limit(1)
-            )
-            if existing.scalar_one_or_none():
-                logger.info(f"Duplicate Asaas webhook event_id={event_id} — skipping")
-                return {"status": "duplicate", "detail": "Event already processed"}
+        # Idempotency: use event_id if present, otherwise fallback to a composite key
+        idempotency_key = str(event_id) if event_id else f"asaas_{payment_id}_{body.get('event', 'unknown')}"
+
+        existing = await db.execute(
+            select(ProviderEvent).where(
+                ProviderEvent.provider == "asaas",
+                ProviderEvent.external_id == idempotency_key,
+                ProviderEvent.processed == True
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            logger.info(f"Duplicate Asaas webhook idempotency_key={idempotency_key} — skipping")
+            return {"status": "duplicate", "detail": "Event already processed"}
 
         event_name = body.get("event", "unknown")
         log_webhook_received("asaas", event_name, payment_id)
 
+        # Sanitize payload before processing
+        sanitized_body = sanitize_webhook_data(body)
+
         service = ChargeService(db)
         charge = await service.process_webhook_payload("asaas", body)
 
+        if event_id or payment_id:
+            # Record the event for audit trail
+            from datetime import datetime, timezone
+            event_record = ProviderEvent(
+                provider="asaas",
+                event_type=event_name,
+                external_id=idempotency_key,
+                payload=sanitized_body,
+                processed=True,
+                processed_at=datetime.now(timezone.utc),
+            )
+            db.add(event_record)
+
         if charge:
-            if event_id:
-                events = await db.execute(
-                    select(ProviderEvent).where(
-                        ProviderEvent.provider == "asaas",
-                        ProviderEvent.external_id == str(event_id)
-                    )
-                )
-                from datetime import datetime, timezone
-                for event in events.scalars().all():
-                    event.processed = True
-                    event.processed_at = datetime.now(timezone.utc)
-                await db.commit()
+            await db.commit()
 
             if charge.status == ChargeStatus.PAID:
                 log_payment_confirmed(charge.user_id, charge.id, "asaas")
