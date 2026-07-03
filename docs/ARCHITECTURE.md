@@ -33,6 +33,7 @@ backend/
 │   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, etc.)
 │   ├── providers/      # Payment providers (fake, mercado_pago)
 │   ├── billing_providers/  # SaaS billing providers (base, fake, factory)
+│   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory) — Sprint 13
 │   ├── integrations/   # External integrations (Twilio)
 │   ├── jobs/           # Background jobs (reminder_scheduler)
 │   └── utils/          # Dependencies, middleware
@@ -315,3 +316,44 @@ When `ENABLE_DEMO_MODE=true`:
 - `GET /health` — Full health check (DB, Redis, OpenAI, Twilio, Mercado Pago)
 - `GET /health/ready` — Readiness probe (DB only, for load balancer)
 - `GET /health/live` — Liveness probe (process alive)
+
+## Regulated Provider Architecture (Sprint 13)
+
+The PayFlow AI is an **orchestrator, interface, and AI layer**. All regulated financial operations are behind provider abstractions.
+
+### Provider Types
+
+| Provider | Responsibility | Fake | Real (future) |
+|---|---|---|---|
+| OpenFinanceProvider | Bank account connection, balances, transactions | ✅ | Pluggy / Belvo / Celcoin |
+| BankingProvider | Account, Pix Out, bill payment | ✅ | Celcoin / QI Tech / Dock |
+| BillPaymentProvider | Boleto validation and payment | ✅ | Celcoin / QI Tech |
+| PixProvider | Pix charges, QR Code, webhooks | ✅ | Asaas / Celcoin / QI Tech |
+| KYCProvider | Identity verification, biometrics | ✅ | Unico / Caf / Certta |
+| FraudProvider | Transaction risk assessment | ✅ | Unico / proprietary |
+| DDAProvider | Automatic bill detection | ✅ | Celcoin / Dock |
+| ReceiptProvider | Transaction receipts | ✅ | Integrated with charge provider |
+| ConsentProvider | Consent management (LGPD, Open Finance) | ✅ | Internal |
+
+### Feature Flags
+
+All regulated features are controlled by feature flags (default `false`):
+
+```
+ENABLE_OPEN_FINANCE=false
+ENABLE_BILL_PAYMENT=false
+ENABLE_PIX_OUT=false
+ENABLE_KYC=false
+ENABLE_DDA=false
+ENABLE_REAL_BANKING=false
+```
+
+### Factory Behavior
+
+- **Default**: Returns fake provider
+- **Demo mode**: Forces fake for all providers
+- **Flag disabled**: Falls back to fake with warning
+- **Production + real provider**: Raises `ValueError` (not yet implemented)
+- **Production + fake**: Works normally
+
+See: `docs/REGULATED_PROVIDER_ARCHITECTURE.md`, `docs/JOTA_PARITY_ROADMAP.md`

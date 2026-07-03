@@ -1,5 +1,20 @@
 # PayFlow AI — Release Notes
 
+## Sprint 13: Jota Feature Parity Blueprint & Regulated Provider Architecture
+
+- **Competitor research**: Comprehensive research of Jota (jota.ai) with 18 sources, 10 confirmed feature categories, parceiros (Celcoin, Unico, Meta), and business model analysis.
+- **Parity matrix**: 40-feature Jota vs PayFlow matrix with gaps, priorities (P0-P3), provider requirements, and suggested sprints.
+- **Regulated provider architecture**: 9 abstract provider interfaces (OpenFinance, Banking, BillPayment, Pix, KYC, Fraud, DDA, Receipt, Consent) with methods, events, risks, fake providers, and real provider candidates.
+- **7-phase roadmap**: Provider foundation → real charges → Open Finance → DDA → payment initiation → KYC/KYB → BaaS/Pix Out. Estimated 4-5 months to full parity.
+- **Consent model**: Open Finance consent, WhatsApp consent, payment authorization (6-digit password), LGPD compliance, pre-authorization rules, revocation, audit logs.
+- **WhatsApp commands**: 13 commands mapped with intent, provider, risk, confirmation, and current status.
+- **Future data model**: 13 proposed tables (provider_connections, open_finance_consents, connected_accounts, bank_transactions, detected_bills, bill_payment_intents, payment_authorizations, payment_receipts, kyc_profiles, kyb_profiles, risk_events, provider_webhook_events, organization_audit_logs).
+- **Feature flags**: 6 regulated feature flags added (ENABLE_OPEN_FINANCE, ENABLE_BILL_PAYMENT, ENABLE_PIX_OUT, ENABLE_KYC, ENABLE_DDA, ENABLE_REAL_BANKING) — all default `false`.
+- **Provider code**: Abstract base classes, fake implementations, and factory with feature flag validation. Production rejects unimplemented real providers. Demo mode forces fake.
+- **Tests**: 43 new tests (feature flags + provider factory). 396 backend tests pass. No regressions.
+- **Documentation**: 8 new docs + README updated with Jota parity roadmap section.
+- **Security**: No regulated operations implemented. No real providers. No secrets. All behind abstraction + feature flags.
+
 ## Sprint 12.1: Billing Hardening
 
 - **Seed idempotency**: `seed_plans()` now updates existing plans with latest definitions instead of skipping. No duplicates on repeated calls.
