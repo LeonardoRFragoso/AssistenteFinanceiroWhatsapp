@@ -71,6 +71,25 @@ class Settings(BaseSettings):
     STRIPE_SANDBOX_WEBHOOK_SECRET: Optional[str] = None
     MERCADO_PAGO_BILLING_SANDBOX_TOKEN: Optional[str] = None
 
+    # Regulated fintech feature flags (all default false — never activate without provider)
+    ENABLE_OPEN_FINANCE: bool = False
+    ENABLE_BILL_PAYMENT: bool = False
+    ENABLE_PIX_OUT: bool = False
+    ENABLE_KYC: bool = False
+    ENABLE_DDA: bool = False
+    ENABLE_REAL_BANKING: bool = False
+
+    # Regulated provider names (all default fake/sandbox)
+    OPEN_FINANCE_PROVIDER: str = "fake"
+    BANKING_PROVIDER_NAME: str = "fake"
+    BILL_PAYMENT_PROVIDER_NAME: str = "fake"
+    PIX_PROVIDER_NAME: str = "fake"
+    KYC_PROVIDER_NAME: str = "fake"
+    FRAUD_PROVIDER_NAME: str = "fake"
+    DDA_PROVIDER_NAME: str = "fake"
+    RECEIPT_PROVIDER_NAME: str = "fake"
+    CONSENT_PROVIDER_NAME: str = "fake"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

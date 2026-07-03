@@ -1,5 +1,17 @@
 # Security Hardening — PayFlow AI
 
+## Regulated Provider Architecture (Sprint 13)
+
+- **Feature flags**: 6 regulated feature flags (`ENABLE_OPEN_FINANCE`, `ENABLE_BILL_PAYMENT`, `ENABLE_PIX_OUT`, `ENABLE_KYC`, `ENABLE_DDA`, `ENABLE_REAL_BANKING`) — all default `false`. No regulated feature can be activated without explicit configuration.
+- **Provider abstraction**: All regulated operations (Open Finance, banking, bill payment, Pix, KYC, fraud, DDA, receipts, consent) are behind abstract interfaces. No real financial operation is implemented directly.
+- **Fake providers default**: All 9 provider types default to fake/sandbox implementations. Safe for development and testing.
+- **Production hardening**: Factory rejects unimplemented real providers in production with `ValueError`. Prevents misconfiguration.
+- **Demo mode**: Forces fake providers for all regulated types, regardless of configuration.
+- **Flag validation**: If feature flag is disabled, factory falls back to fake with warning — even if provider name is set to a real provider.
+- **No secrets in code**: No API keys, credentials, or secrets for regulated providers are committed. All provider names default to "fake".
+- **Consent model**: Documented consent and authorization model for Open Finance, payment authorization (6-digit password), LGPD compliance, and audit logging.
+- **Future data model**: 13 proposed tables with encryption requirements for sensitive fields (CPF, CNPJ, document numbers).
+
 ## SaaS Billing Hardening (Sprint 12.1)
 
 - **Seed idempotency**: `seed_plans()` updates existing plans with latest definitions. No duplicates, always in sync with code.

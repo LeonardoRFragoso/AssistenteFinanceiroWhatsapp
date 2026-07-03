@@ -6,7 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7+-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-289%20backend%20%2B%2029%20E2E-success)
+![Tests](https://img.shields.io/badge/Tests-396%20backend%20%2B%2036%20E2E-success)
 ![E2E](https://img.shields.io/badge/E2E-Playwright-orange?logo=playwright&logoColor=white)
 
 SaaS financeiro conversacional para gestão de cobranças via WhatsApp com dashboard web. IA processa linguagem natural, cria cobranças, envia links de pagamento e acompanha recebimentos — com confirmação explícita do usuário em cada operação.
@@ -180,10 +180,63 @@ npm run test:e2e
 - [x] Sprint 5-5.1: Demo mode, landing page, hardening de segurança
 - [x] Sprint 6-6.1: E2E, observabilidade, rate limiting, webhook hardening, CI stabilization
 - [x] Sprint 7: Portfolio polish, case study, screenshots, release candidate
-- [ ] Multi-tenant (organizações com múltiplos usuários)
-- [ ] Integração com mais provedores de pagamento
-- [ ] Dashboard de admin avançado com gráficos temporais
-- [ ] App mobile (React Native)
+- [x] Sprint 8: WhatsApp Intelligence, QR Code sandbox, OCR assistivo, tarefas recorrentes
+- [x] Sprint 9-9.1: Customer intelligence, collection playbooks, E2E coverage
+- [x] Sprint 11-11.2: Multi-tenant workspaces, RBAC, migration portability
+- [x] Sprint 12-12.1: SaaS billing, plans, usage limits, billing hardening
+- [x] Sprint 13: Jota parity blueprint & regulated provider architecture
+- [ ] Sprint 14: Provider foundation (abstrações, fake providers, consent model)
+- [ ] Sprint 15: Real charge provider (Asaas/Celcoin — Pix cobrança, boleto)
+- [ ] Sprint 16: Open Finance read (Pluggy/Belvo — saldo, extrato, transações)
+- [ ] Sprint 17: DDA e contas a pagar
+- [ ] Sprint 18: Payment initiation sandbox
+- [ ] Sprint 19: KYC/KYB (Unico — biometria, onboarding)
+- [ ] Sprint 20+: BaaS/Pix Out real (parceiro regulado)
+
+## Roadmap to Jota-level Parity
+
+O PayFlow AI não será lançado publicamente até atingir paridade funcional percebida com o [Jota](https://jota.ai). Veja a documentação completa em:
+
+- [`docs/COMPETITOR_JOTA_RESEARCH.md`](docs/COMPETITOR_JOTA_RESEARCH.md) — Pesquisa funcional do Jota
+- [`docs/JOTA_PARITY_MATRIX.md`](docs/JOTA_PARITY_MATRIX.md) — Matriz Jota vs PayFlow (40 funcionalidades)
+- [`docs/REGULATED_PROVIDER_ARCHITECTURE.md`](docs/REGULATED_PROVIDER_ARCHITECTURE.md) — Arquitetura de providers regulados
+- [`docs/JOTA_PARITY_ROADMAP.md`](docs/JOTA_PARITY_ROADMAP.md) — Roadmap de 7 fases (4-5 meses)
+- [`docs/CONSENT_AND_AUTHORIZATION_MODEL.md`](docs/CONSENT_AND_AUTHORIZATION_MODEL.md) — Modelo de consentimento
+- [`docs/WHATSAPP_JOTA_PARITY_COMMANDS.md`](docs/WHATSAPP_JOTA_PARITY_COMMANDS.md) — Comandos WhatsApp mapeados
+- [`docs/FUTURE_FINTECH_DATA_MODEL.md`](docs/FUTURE_FINTECH_DATA_MODEL.md) — Modelo de dados fintech futuro
+
+### Funcionalidades prontas
+- IA conversacional no WhatsApp (texto, áudio, imagem)
+- Cobranças sandbox com QR Code fake
+- Dashboard web com analytics
+- Multi-tenant com RBAC (owner/admin/finance/viewer)
+- SaaS billing com planos e limites
+- Templates de mensagem, regras de cobrança, collection intelligence
+- Lembretes e tarefas recorrentes
+- OCR de documentos
+- 396 testes backend + 36 E2E
+
+### Funcionalidades sandbox (prontas, aguardando provider real)
+- Cobrança Pix (QR Code simulado)
+- Webhook de recebimento (simulado)
+- Provider factory com feature flags
+
+### Funcionalidades futuras com parceiros regulados
+- **Conta digital** (BaaS — Celcoin/QI Tech)
+- **Pix Out** (envio de dinheiro — Celcoin/QI Tech)
+- **Pagamento de boletos** (Celcoin/QI Tech)
+- **Open Finance** (saldo, extrato — Pluggy/Belvo)
+- **DDA** (detecção automática de boletos — Celcoin/Dock)
+- **KYC/KYB** (biometria facial — Unico)
+- **Rendimento automático** (100% CDI — BaaS)
+
+### Disclaimer de segurança
+- O PayFlow AI é um **orquestrador, interface e camada de IA**.
+- Liquidação financeira, Open Finance real, Pix Out, conta digital e KYC **dependem de parceiros regulados**.
+- Nenhuma operação regulada é implementada diretamente no código.
+- Todos os providers regulados têm feature flags (`false` por padrão).
+- Provider padrão é sempre fake/sandbox.
+- Demo mode força fake providers.
 
 ## � Como Testar o WhatsApp
 
@@ -765,18 +818,6 @@ Este projeto é proprietário. Todos os direitos reservados.
 Para suporte, entre em contato via:
 - Email: suporte@seudominio.com
 - WhatsApp: +55 11 99999-9999
-
-## 🎯 Roadmap
-
-- [ ] Integração com Stripe para pagamentos
-- [ ] Exportação de relatórios em PDF
-- [ ] Gráficos avançados (Recharts)
-- [ ] Notificações push
-- [ ] App mobile (React Native)
-- [ ] Múltiplas moedas
-- [ ] Categorias personalizadas
-- [ ] Metas financeiras
-- [ ] Análise preditiva com IA
 
 ---
 
