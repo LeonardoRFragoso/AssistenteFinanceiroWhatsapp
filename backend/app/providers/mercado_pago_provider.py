@@ -26,7 +26,8 @@ class MercadoPagoPaymentProvider(PaymentProvider):
         customer_phone: Optional[str] = None,
         external_reference: Optional[str] = None,
         due_date: Optional[str] = None,
-        payer_email: Optional[str] = None
+        payer_email: Optional[str] = None,
+        billing_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         try:
             # Mercado Pago preference does not accept a phone in the item, so we

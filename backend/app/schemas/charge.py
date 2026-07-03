@@ -11,6 +11,7 @@ class ChargeCreate(BaseModel):
     amount: Decimal = Field(..., gt=0, decimal_places=2)
     description: Optional[str] = Field(None, max_length=1000)
     provider: Optional[str] = Field(None, max_length=50)
+    billing_type: Optional[str] = Field(None, max_length=20)
     due_date: Optional[date] = None
 
     @field_validator('amount')
@@ -33,6 +34,8 @@ class ChargeResponse(BaseModel):
     payment_link: Optional[str]
     qr_code: Optional[str]
     qr_code_base64: Optional[str]
+    provider_bank_slip_url: Optional[str] = None
+    provider_status: Optional[str] = None
     status: ChargeStatus
     derived_status: Optional[str] = None
     due_date: Optional[date] = None

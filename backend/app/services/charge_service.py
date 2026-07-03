@@ -46,7 +46,8 @@ class ChargeService:
             customer_phone=data.customer_phone,
             external_reference=external_reference,
             due_date=due_date_str,
-            payer_email=payer_email
+            payer_email=payer_email,
+            billing_type=data.billing_type,
         )
 
         charge = await self.charge_repo.create(
@@ -64,6 +65,12 @@ class ChargeService:
             due_date=data.due_date,
             status=ChargeStatus.PENDING
         )
+
+        if result.get("provider_bank_slip_url"):
+            charge.provider_bank_slip_url = result["provider_bank_slip_url"]
+        if result.get("provider_status"):
+            charge.provider_status = result["provider_status"]
+        await self.db.flush()
 
         logger.info(f"Charge {charge.id} created for user {user_id} via {provider_name}")
 
@@ -191,13 +198,29 @@ class ChargeService:
             await self.db.refresh(charge)
             logger.info(f"Charge {charge.id} marked as paid via {provider}")
             await self._notify_payment_received(charge)
+        elif status == "expired":
+            charge.status = ChargeStatus.EXPIRED
+            await self.db.commit()
+            await self.db.refresh(charge)
+            logger.info(f"Charge {charge.id} marked as expired via {provider}")
+        elif status == "cancelled":
+            charge.status = ChargeStatus.CANCELLED
+            await self.db.commit()
+            await self.db.refresh(charge)
+            logger.info(f"Charge {charge.id} marked as cancelled via {provider}")
 
         return charge
 
     async def process_webhook_payload(self, provider_name: str, payload: Dict[str, Any]) -> Optional[Charge]:
         """Parse a provider webhook payload and process the resulting event."""
-        from app.providers.provider_factory import get_payment_provider
-        provider = get_payment_provider(provider_name)
+        provider = None
+        if provider_name == "asaas":
+            from app.providers.asaas_provider import AsaasPaymentProvider
+            provider = AsaasPaymentProvider.__new__(AsaasPaymentProvider)
+            provider.name = "asaas"
+        else:
+            from app.providers.provider_factory import get_payment_provider
+            provider = get_payment_provider(provider_name)
         event = provider.parse_webhook_event(payload)
         if not event:
             logger.warning(f"Could not parse webhook payload from {provider_name}")
@@ -240,3 +263,66 @@ class ChargeService:
             await twilio.send_message(user.phone_number, message)
         except Exception as e:
             logger.error(f"Error notifying payment received: {str(e)}")
+
+    async def sync_provider_status(
+        self,
+        charge_id: int,
+        user_id: int,
+        organization_id: Optional[int] = None,
+    ) -> Optional[Charge]:
+        """Manually sync a charge's status from the provider.
+
+        Calls the provider's get_charge endpoint and updates the local charge.
+        Does NOT execute any payment — read-only reconciliation.
+        """
+        charge = await self.charge_repo.get_by_id(charge_id, user_id, organization_id)
+        if not charge:
+            return None
+
+        if charge.status == ChargeStatus.PAID:
+            logger.info(f"Charge {charge.id} already paid, skipping sync")
+            return charge
+
+        from app.providers.provider_factory import get_payment_provider
+
+        try:
+            provider = get_payment_provider(charge.provider)
+        except RuntimeError as e:
+            logger.warning(f"Cannot sync charge {charge.id}: provider '{charge.provider}' not available: {e}")
+            return charge
+
+        if not charge.provider_charge_id:
+            logger.warning(f"Charge {charge.id} has no provider_charge_id, cannot sync")
+            return charge
+
+        result = await provider.get_charge(charge.provider_charge_id)
+        if not result:
+            return charge
+
+        provider_status = result.get("provider_status")
+        mapped_status = result.get("status")
+
+        if provider_status:
+            charge.provider_status = provider_status
+
+        if mapped_status == "paid" and charge.status != ChargeStatus.PAID:
+            charge.status = ChargeStatus.PAID
+            charge.paid_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            await self.db.refresh(charge)
+            logger.info(f"Charge {charge.id} synced to paid via {charge.provider}")
+            await self._notify_payment_received(charge)
+        elif mapped_status == "expired" and charge.status == ChargeStatus.PENDING:
+            charge.status = ChargeStatus.EXPIRED
+            await self.db.commit()
+            await self.db.refresh(charge)
+            logger.info(f"Charge {charge.id} synced to expired via {charge.provider}")
+        elif mapped_status == "cancelled" and charge.status in (ChargeStatus.PENDING, ChargeStatus.EXPIRED):
+            charge.status = ChargeStatus.CANCELLED
+            await self.db.commit()
+            await self.db.refresh(charge)
+            logger.info(f"Charge {charge.id} synced to cancelled via {charge.provider}")
+        else:
+            await self.db.flush()
+
+        return charge

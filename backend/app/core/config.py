@@ -90,6 +90,13 @@ class Settings(BaseSettings):
     RECEIPT_PROVIDER_NAME: str = "fake"
     CONSENT_PROVIDER_NAME: str = "fake"
 
+    # Asaas charge provider (sandbox opt-in)
+    ASAAS_ENVIRONMENT: str = "sandbox"
+    ASAAS_API_BASE_URL: str = "https://sandbox.asaas.com/api/v3"
+    ASAAS_API_KEY: Optional[str] = None
+    ASAAS_WEBHOOK_TOKEN: Optional[str] = None
+    ENABLE_ASAAS_CHARGE_PROVIDER: bool = False
+
     class Config:
         env_file = ".env"
         case_sensitive = True

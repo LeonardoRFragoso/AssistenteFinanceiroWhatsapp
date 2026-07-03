@@ -75,6 +75,7 @@ class PendingActionService:
                 customer_phone=payload.get("customer_phone"),
                 amount=amount,
                 description=payload.get("description"),
+                billing_type=payload.get("billing_type"),
                 due_date=payload.get("due_date")
             )
 

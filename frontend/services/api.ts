@@ -93,6 +93,7 @@ export const chargesAPI = {
   getById: (id: number) => api.get(`/charges/${id}`),
   create: (data: any) => api.post('/charges/', data),
   cancel: (id: number) => api.post(`/charges/${id}/cancel`),
+  syncProviderStatus: (id: number) => api.post(`/charges/${id}/sync-provider-status`),
   getSummary: () => api.get('/charges/summary'),
   getAnalytics: () => api.get('/charges/analytics'),
   exportCSV: (status?: string, search?: string) => {

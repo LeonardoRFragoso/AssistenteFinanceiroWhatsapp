@@ -31,10 +31,10 @@ backend/
 │   ├── repositories/   # Data access layer
 │   ├── services/       # Business logic (AIService, ChargeService, SaaSBillingService, EntitlementsService, ProviderConnectionService, etc.)
 │   ├── routers/        # FastAPI endpoints (charges, billing_saas, webhook, admin, providers, etc.)
-│   ├── providers/      # Payment providers (fake, mercado_pago)
+│   ├── providers/      # Payment providers (fake, mercado_pago, asaas) — Sprint 15
 │   ├── billing_providers/  # SaaS billing providers (base, fake, factory)
 │   ├── regulated_providers/  # Regulated fintech providers (base, fake, factory) — Sprint 13
-│   ├── integrations/   # External integrations (Twilio)
+│   ├── integrations/   # External integrations (Twilio, AsaasClient) — Sprint 15
 │   ├── jobs/           # Background jobs (reminder_scheduler)
 │   └── utils/          # Dependencies, middleware
 ├── scripts/            # Utility scripts (seed_demo_data.py, audit_multitenant_integrity.py)
@@ -387,3 +387,30 @@ transaction_authorizations  — 6-digit challenge auth (hashed code, 5min expiry
 - All providers default to fake; real providers blocked by feature flags
 
 See: `docs/SPRINT_14_PROVIDER_FOUNDATION.md`
+
+## Asaas Sandbox Charge Provider (Sprint 15)
+
+Integrates Asaas API v3 in sandbox mode for receive-only charge creation (Pix, boleto, payment links).
+
+**Components:**
+- `app/integrations/asaas_client.py` — HTTP client with retry, timeout, sanitization
+- `app/providers/asaas_provider.py` — `PaymentProvider` implementation for Asaas
+- `app/providers/provider_factory.py` — updated to support `asaas` provider name
+- `app/routers/provider_webhooks.py` — `POST /provider-webhooks/asaas` endpoint
+- `app/routers/providers.py` — `POST /providers/asaas/test-connection` endpoint
+- `app/routers/charges.py` — `POST /charges/{id}/sync-provider-status` endpoint
+
+**Charge model additions:**
+- `provider_bank_slip_url` — boleto PDF URL (Asaas)
+- `provider_status` — raw provider status string
+- `billing_type` in `ChargeCreate` schema (pix/boleto/undefined)
+
+**Security:**
+- API key never logged; `_sanitize_for_log` redacts sensitive keys
+- Webhook token validation via `asaas-access-token` header
+- Idempotent webhook processing by `event_id`
+- Demo mode blocks Asaas; feature flag defaults to false
+- Production rejects unknown providers (no silent fallback)
+- Only receive-only operations (no Pix Out, no withdrawals)
+
+See: `docs/SPRINT_15_ASAAS_SANDBOX_PROVIDER.md`

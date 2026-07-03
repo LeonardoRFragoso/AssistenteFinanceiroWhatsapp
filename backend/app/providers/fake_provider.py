@@ -29,7 +29,8 @@ class FakePaymentProvider(PaymentProvider):
         customer_phone: Optional[str] = None,
         external_reference: Optional[str] = None,
         due_date: Optional[str] = None,
-        payer_email: Optional[str] = None
+        payer_email: Optional[str] = None,
+        billing_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         provider_charge_id = f"fake_{uuid.uuid4().hex[:12]}"
         payment_link = f"{settings.BACKEND_URL}/provider-webhooks/fake/pay/{provider_charge_id}"

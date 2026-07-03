@@ -495,3 +495,35 @@ async def get_charge_qr_code(
         "is_sandbox": True,
         "warning": "Sandbox/Demo — não representa Pix real",
     }
+
+
+@router.post("/{charge_id}/sync-provider-status", response_model=ChargeResponse)
+async def sync_provider_status(
+    charge_id: int,
+    current_user: User = Depends(get_current_active_user),
+    org: Organization = Depends(get_current_organization),
+    role: OrganizationRole = Depends(get_current_user_role),
+    db: AsyncSession = Depends(get_db)
+):
+    """Manually sync a charge's status from the provider.
+
+    Calls the provider's API to get the current payment status and updates
+    the local charge record. Does NOT execute any payment.
+
+    RBAC: owner/admin/finance only.
+    """
+    if not has_permission(role, "manage_charges"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not allow syncing charge status",
+        )
+    service = ChargeService(db)
+    charge = await service.sync_provider_status(
+        charge_id, current_user.id, organization_id=org.id
+    )
+    if not charge:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Charge not found"
+        )
+    return charge

@@ -6,7 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7+-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-434%20backend%20%2B%2036%20E2E-success)
+![Tests](https://img.shields.io/badge/Tests-473%20backend%20%2B%2036%20E2E-success)
 ![E2E](https://img.shields.io/badge/E2E-Playwright-orange?logo=playwright&logoColor=white)
 
 SaaS financeiro conversacional para gestão de cobranças via WhatsApp com dashboard web. IA processa linguagem natural, cria cobranças, envia links de pagamento e acompanha recebimentos — com confirmação explícita do usuário em cada operação.
@@ -186,7 +186,7 @@ npm run test:e2e
 - [x] Sprint 12-12.1: SaaS billing, plans, usage limits, billing hardening
 - [x] Sprint 13: Jota parity blueprint & regulated provider architecture
 - [x] Sprint 14: Provider foundation, consent, audit logs & transaction auth
-- [ ] Sprint 15: Real charge provider (Asaas/Celcoin — Pix cobrança, boleto)
+- [x] Sprint 15: Asaas sandbox charge provider (Pix, boleto, payment links, webhooks)
 - [ ] Sprint 16: Open Finance read (Pluggy/Belvo — saldo, extrato, transações)
 - [ ] Sprint 17: DDA e contas a pagar
 - [ ] Sprint 18: Payment initiation sandbox
@@ -208,13 +208,16 @@ O PayFlow AI não será lançado publicamente até atingir paridade funcional pe
 ### Funcionalidades prontas
 - IA conversacional no WhatsApp (texto, áudio, imagem)
 - Cobranças sandbox com QR Code fake
+- Asaas sandbox: Pix, boleto e link de pagamento (opt-in)
+- Webhooks Asaas com idempotência e validação de token
+- Reconciliação manual de status de cobrança
 - Dashboard web com analytics
 - Multi-tenant com RBAC (owner/admin/finance/viewer)
 - SaaS billing com planos e limites
 - Templates de mensagem, regras de cobrança, collection intelligence
 - Lembretes e tarefas recorrentes
 - OCR de documentos
-- 434 testes backend + 36 E2E
+- 473 testes backend + 36 E2E
 
 ### Funcionalidades sandbox (prontas, aguardando provider real)
 - Cobrança Pix (QR Code simulado)

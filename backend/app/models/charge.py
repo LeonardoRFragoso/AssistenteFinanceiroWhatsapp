@@ -28,6 +28,8 @@ class Charge(Base):
     payment_link = Column(Text, nullable=True)
     qr_code = Column(Text, nullable=True)
     qr_code_base64 = Column(Text, nullable=True)
+    provider_bank_slip_url = Column(Text, nullable=True)
+    provider_status = Column(String(50), nullable=True)
     status = Column(Enum(ChargeStatus, values_callable=lambda x: [e.value for e in x]), nullable=False, default=ChargeStatus.PENDING, index=True)
     due_date = Column(Date, nullable=True)
     paid_at = Column(DateTime(timezone=True), nullable=True)
