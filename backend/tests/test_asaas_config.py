@@ -6,11 +6,23 @@ import pytest
 from app.core.config import Settings
 
 
-def test_asaas_config_defaults():
+_ASAAS_ENV_KEYS = [
+    "ASAAS_ENVIRONMENT",
+    "ASAAS_API_BASE_URL",
+    "ASAAS_API_KEY",
+    "ASAAS_WEBHOOK_TOKEN",
+    "ENABLE_ASAAS_CHARGE_PROVIDER",
+]
+
+
+def test_asaas_config_defaults(monkeypatch):
     """Asaas config vars should default to disabled/sandbox."""
+    for key in _ASAAS_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
     s = Settings(
         DATABASE_URL="sqlite:///test.db",
         SECRET_KEY="test-secret",
+        _env_file=None,
     )
     assert s.ASAAS_ENVIRONMENT == "sandbox"
     assert s.ASAAS_API_BASE_URL == "https://sandbox.asaas.com/api/v3"
@@ -19,14 +31,17 @@ def test_asaas_config_defaults():
     assert s.ENABLE_ASAAS_CHARGE_PROVIDER is False
 
 
-def test_asaas_config_can_be_enabled():
+def test_asaas_config_can_be_enabled(monkeypatch):
     """Asaas config can be set via env."""
+    for key in _ASAAS_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
     s = Settings(
         DATABASE_URL="sqlite:///test.db",
         SECRET_KEY="test-secret",
         ENABLE_ASAAS_CHARGE_PROVIDER=True,
         ASAAS_API_KEY="test-key-123",
         ASAAS_WEBHOOK_TOKEN="test-webhook-token-32chars-min!!!",
+        _env_file=None,
     )
     assert s.ENABLE_ASAAS_CHARGE_PROVIDER is True
     assert s.ASAAS_API_KEY == "test-key-123"
