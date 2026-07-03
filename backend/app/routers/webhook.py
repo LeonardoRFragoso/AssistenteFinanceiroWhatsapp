@@ -427,6 +427,21 @@ async def process_intent(
         elif intent == "check_charge_status":
             return await handle_check_charge_status(user_id, entities, db, ai_service, context)
 
+        elif intent == "open_finance_balance_summary":
+            return await handle_of_balance_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "open_finance_recent_transactions":
+            return await handle_of_recent_transactions(user_id, entities, db, ai_service, context)
+
+        elif intent == "open_finance_monthly_summary":
+            return await handle_of_monthly_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "open_finance_category_summary":
+            return await handle_of_category_summary(user_id, entities, db, ai_service, context)
+
+        elif intent == "open_finance_search_transactions":
+            return await handle_of_search_transactions(user_id, entities, db, ai_service, context)
+
         else:
             return await handle_help(ai_service, context)
     
@@ -1754,3 +1769,195 @@ async def handle_collection_performance_summary(
     except Exception as e:
         logger.error(f"Error in collection performance: {str(e)}")
         return "Erro ao gerar performance de cobrança. Tente novamente."
+
+
+# ============================================================
+# Open Finance WhatsApp intents — Sprint 16
+# All data is fake/demo. Never claims real bank connection.
+# ============================================================
+
+async def _get_org_id_for_user(db: AsyncSession, user_id: int) -> int:
+    """Resolve organization_id for a user."""
+    from app.services.organization_service import OrganizationService
+    from app.repositories.user_repository import UserRepository
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+    if not user:
+        raise ValueError("User not found")
+    org_service = OrganizationService(db)
+    org = await org_service.ensure_default_organization(user)
+    return org.id
+
+
+async def handle_of_balance_summary(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'quanto tenho disponível?' — fake balance summary."""
+    try:
+        from app.services.financial_summary_service import FinancialSummaryService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = FinancialSummaryService(db)
+        summary = await service.get_balance_summary(org_id)
+
+        if summary["accounts_count"] == 0:
+            return (
+                "📊 *Open Finance — Saldo*\n\n"
+                "⚠️ [Dados de demonstração] Você ainda não tem contas conectadas.\n"
+                "Acesse o dashboard para criar um consentimento fake e sincronizar dados demo."
+            )
+
+        message = "📊 *Open Finance — Saldo*\n\n"
+        message += "⚠️ _Dados de demonstração — não são dados reais de banco._\n\n"
+        message += f"💰 Saldo total disponível: R$ {float(summary['total_balance_available']):.2f}\n"
+        message += f"🏦 Saldo total atual: R$ {float(summary['total_balance_current']):.2f}\n"
+        message += f"📋 Contas conectadas: {summary['accounts_count']}\n\n"
+
+        for acc in summary["accounts"]:
+            message += f"  • {acc['institution_name']} ({acc['account_number_masked']}): R$ {float(acc['balance_available'] or 0):.2f}\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in OF balance summary: {str(e)}")
+        return "Erro ao buscar saldo. Tente novamente."
+
+
+async def handle_of_recent_transactions(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'me mostre minhas últimas transações' — fake recent transactions."""
+    try:
+        from app.services.bank_transaction_service import BankTransactionService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BankTransactionService(db)
+        transactions = await service.list_transactions(org_id, limit=10)
+
+        if not transactions:
+            return (
+                "📋 *Open Finance — Transações*\n\n"
+                "⚠️ [Dados de demonstração] Nenhuma transação encontrada.\n"
+                "Sincronize dados demo no dashboard para ver transações."
+            )
+
+        message = "📋 *Open Finance — Últimas transações*\n\n"
+        message += "⚠️ _Dados de demonstração — não são dados reais de banco._\n\n"
+
+        for i, tx in enumerate(transactions[:10], 1):
+            sign = "➕" if tx.transaction_type.value == "credit" else "➖"
+            message += f"{i}. {sign} R$ {abs(float(tx.amount)):.2f} — {tx.description or 'N/A'}\n"
+            if tx.merchant_name:
+                message += f"   🏪 {tx.merchant_name} | {tx.category or 'Sem categoria'}\n"
+            if tx.transaction_date:
+                message += f"   📅 {tx.transaction_date.strftime('%d/%m/%Y')}\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in OF recent transactions: {str(e)}")
+        return "Erro ao buscar transações. Tente novamente."
+
+
+async def handle_of_monthly_summary(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'resuma meus gastos do mês' — fake monthly summary."""
+    try:
+        from app.services.financial_summary_service import FinancialSummaryService
+        from datetime import date as dt_date
+        org_id = await _get_org_id_for_user(db, user_id)
+        now = dt_date.today()
+        service = FinancialSummaryService(db)
+        summary = await service.get_monthly_summary(org_id, now.year, now.month)
+
+        month_names = [
+            "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+        ]
+        month_name = month_names[now.month - 1]
+
+        message = f"📊 *Resumo financeiro — {month_name}/{now.year}*\n\n"
+        message += "⚠️ _Dados de demonstração — não são dados reais de banco._\n\n"
+        message += f"💰 Entradas: R$ {float(summary['income_total']):.2f}\n"
+        message += f"➖ Saídas: R$ {float(summary['expense_total']):.2f}\n"
+        message += f"📊 Saldo: R$ {float(summary['net_flow']):.2f}\n"
+        message += f"📋 Transações: {summary['transaction_count']}\n\n"
+
+        if summary.get("top_categories"):
+            message += "🏷️ *Top categorias:*\n"
+            for cat in summary["top_categories"][:3]:
+                message += f"   • {cat['category']}: R$ {abs(float(cat['total_amount'])):.2f} ({cat['percentage']:.1f}%)\n"
+
+        if summary.get("insight"):
+            message += f"\n💡 {summary['insight']}"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in OF monthly summary: {str(e)}")
+        return "Erro ao gerar resumo mensal. Tente novamente."
+
+
+async def handle_of_category_summary(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle 'quanto gastei com mercado?' — fake category breakdown."""
+    try:
+        from app.services.bank_transaction_service import BankTransactionService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BankTransactionService(db)
+
+        category = entities.get("category")
+        if category:
+            transactions = await service.list_transactions(org_id, category=category, limit=20)
+            total = sum(abs(float(t.amount)) for t in transactions if t.transaction_type.value == "debit")
+            message = f"🏷️ *Open Finance — {category}*\n\n"
+            message += "⚠️ _Dados de demonstração._\n\n"
+            message += f"Total gasto: R$ {total:.2f}\n"
+            message += f"Transações: {len(transactions)}\n"
+            if transactions:
+                message += "\nÚltimas:\n"
+                for tx in transactions[:5]:
+                    message += f"  • R$ {abs(float(tx.amount)):.2f} — {tx.description or 'N/A'}\n"
+            return message
+        else:
+            breakdown = await service.group_by_category(org_id)
+            if not breakdown:
+                return "⚠️ [Dados de demonstração] Nenhuma transação encontrada. Sincronize dados demo no dashboard."
+
+            message = "🏷️ *Open Finance — Categorias*\n\n"
+            message += "⚠️ _Dados de demonstração._\n\n"
+            for cat in breakdown[:8]:
+                message += f"  • {cat['category']}: R$ {abs(float(cat['total_amount'])):.2f} ({cat['percentage']:.1f}%)\n"
+            return message
+    except Exception as e:
+        logger.error(f"Error in OF category summary: {str(e)}")
+        return "Erro ao buscar categorias. Tente novamente."
+
+
+async def handle_of_search_transactions(
+    user_id: int, entities: dict, db: AsyncSession, ai_service: AIService, context: str
+) -> str:
+    """Handle search for transactions by text — fake search."""
+    try:
+        from app.services.bank_transaction_service import BankTransactionService
+        org_id = await _get_org_id_for_user(db, user_id)
+        service = BankTransactionService(db)
+
+        search_term = entities.get("search_term") or entities.get("query") or ""
+        if not search_term:
+            return "🔍 Qual termo você quer buscar nas transações?"
+
+        transactions = await service.list_transactions(org_id, search=search_term, limit=10)
+
+        if not transactions:
+            return f"⚠️ [Dados de demonstração] Nenhuma transação encontrada para \"{search_term}\"."
+
+        message = f"🔍 *Busca: \"{search_term}\"*\n\n"
+        message += "⚠️ _Dados de demonstração._\n\n"
+        for i, tx in enumerate(transactions[:10], 1):
+            sign = "➕" if tx.transaction_type.value == "credit" else "➖"
+            message += f"{i}. {sign} R$ {abs(float(tx.amount)):.2f} — {tx.description or 'N/A'}\n"
+            if tx.merchant_name:
+                message += f"   🏪 {tx.merchant_name}\n"
+
+        return message
+    except Exception as e:
+        logger.error(f"Error in OF search transactions: {str(e)}")
+        return "Erro ao buscar transações. Tente novamente."

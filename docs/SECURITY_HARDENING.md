@@ -1,5 +1,22 @@
 # Security Hardening — PayFlow AI
 
+## Open Finance Read Provider Security (Sprint 16)
+
+- **Feature flag defaults false**: `ENABLE_OPEN_FINANCE=false` — no Open Finance functionality active unless explicitly enabled.
+- **Provider defaults fake**: `OPEN_FINANCE_PROVIDER=fake` — only fake/demo data generated. No real API calls.
+- **Demo mode forces fake**: When `ENABLE_DEMO_MODE=true`, Open Finance provider is always fake regardless of config.
+- **No real API calls**: `FakeOpenFinanceReadProvider` generates all data locally. No HTTP requests to Pluggy, Belvo, or any external service.
+- **No real tokens stored**: No access tokens, refresh tokens, or bank credentials stored in database.
+- **All data marked demo**: `is_demo_data=True` on all `ConnectedAccount` and `BankTransaction` records for transparency.
+- **WhatsApp demo disclaimer**: All Open Finance WhatsApp responses include "Dados de demonstração" text.
+- **No payment initiation**: Read-only operations only. No Pix Out, no boleto payment, no DDA, no transfers.
+- **No financial advice**: `FinancialSummaryService` generates informative insights only. No investment recommendations or credit advice.
+- **Org-scoped data**: All models have `organization_id` foreign key. All queries filter by org. Multi-tenant audit script includes new tables.
+- **RBAC enforcement**: Write operations (consent creation, sync, revocation) require owner/admin/finance role. Read operations also require finance role.
+- **Audit logging**: All consent creation, revocation, and sync operations logged via `OrganizationAuditService` with actor, action, and metadata.
+- **Sync logs**: `OpenFinanceSyncLog` records every sync operation with type, status, record counts, and error messages.
+- **Unique constraints**: `bank_transactions` has unique constraint on `(organization_id, provider_name, external_transaction_id)` to prevent duplicates.
+
 ## Asaas Sandbox Provider Security (Sprint 15)
 
 - **API key never logged**: `AsaasClient` sends API key via `access_token` header only. All log statements sanitize sensitive keys before output.

@@ -1,5 +1,19 @@
 # PayFlow AI — Release Notes
 
+## Sprint 16: Open Finance Read Provider Foundation
+
+- **Fake/sandbox Open Finance provider**: `FakeOpenFinanceReadProvider` generates realistic demo data (2 accounts, 20-40 transactions, 12 categories). No real API calls to Pluggy/Belvo. All data marked `is_demo_data=True`.
+- **4 new models**: `ConnectedAccount`, `BankTransaction`, `FinancialCategory`, `OpenFinanceSyncLog` — all org-scoped with proper indexes and constraints.
+- **Migration**: `m2b3c4d5e6f7` — creates 4 new tables with foreign keys, unique constraints, and indexes.
+- **3 new services**: `OpenFinanceService` (consent, sync, audit), `BankTransactionService` (listing, filtering, grouping), `FinancialSummaryService` (monthly summaries, balance, safe insights).
+- **Router**: `/open-finance` prefix with 11 endpoints. RBAC: owner/admin/finance for write operations.
+- **WhatsApp intents**: 5 new intents for fake financial data reading (balance, transactions, monthly summary, categories, search). All responses include demo disclaimer.
+- **Frontend**: `OpenFinanceSection.tsx` component with demo badge, consent creation, sync, accounts, and transactions display.
+- **Admin metrics**: Open Finance account/transaction/sync-log counts added to billing-metrics endpoint.
+- **Research doc**: `docs/OPEN_FINANCE_PROVIDER_RESEARCH.md` — Pluggy vs Belvo comparison and recommendations.
+- **Tests**: 43 new tests across 4 files (models, service, router, WhatsApp). Total: 516 backend tests, 0 failures.
+- **Security**: `ENABLE_OPEN_FINANCE` defaults false, `OPEN_FINANCE_PROVIDER` defaults "fake", demo mode forced, no real tokens, no payment initiation, audit logging, org-scoped data.
+
 ## Sprint 15: Asaas Sandbox Charge Provider
 
 - **Asaas API v3 integration**: Sandbox mode for Pix, boleto, and payment link charges. Receive-only operations (no Pix Out, no withdrawals).

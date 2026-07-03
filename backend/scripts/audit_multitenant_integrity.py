@@ -35,6 +35,10 @@ ORG_SCOPED_TABLES = [
     "open_finance_consents",
     "organization_audit_logs",
     "transaction_authorizations",
+    "connected_accounts",
+    "bank_transactions",
+    "financial_categories",
+    "open_finance_sync_logs",
 ]
 
 

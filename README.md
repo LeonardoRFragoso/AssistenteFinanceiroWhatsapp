@@ -6,7 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7+-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-473%20backend%20%2B%2036%20E2E-success)
+![Tests](https://img.shields.io/badge/Tests-516%20backend%20%2B%2036%20E2E-success)
 ![E2E](https://img.shields.io/badge/E2E-Playwright-orange?logo=playwright&logoColor=white)
 
 SaaS financeiro conversacional para gestão de cobranças via WhatsApp com dashboard web. IA processa linguagem natural, cria cobranças, envia links de pagamento e acompanha recebimentos — com confirmação explícita do usuário em cada operação.
@@ -187,7 +187,7 @@ npm run test:e2e
 - [x] Sprint 13: Jota parity blueprint & regulated provider architecture
 - [x] Sprint 14: Provider foundation, consent, audit logs & transaction auth
 - [x] Sprint 15: Asaas sandbox charge provider (Pix, boleto, payment links, webhooks)
-- [ ] Sprint 16: Open Finance read (Pluggy/Belvo — saldo, extrato, transações)
+- [x] Sprint 16: Open Finance read provider foundation (fake/sandbox — saldo, extrato, transações, categorias)
 - [ ] Sprint 17: DDA e contas a pagar
 - [ ] Sprint 18: Payment initiation sandbox
 - [ ] Sprint 19: KYC/KYB (Unico — biometria, onboarding)
@@ -217,7 +217,7 @@ O PayFlow AI não será lançado publicamente até atingir paridade funcional pe
 - Templates de mensagem, regras de cobrança, collection intelligence
 - Lembretes e tarefas recorrentes
 - OCR de documentos
-- 473 testes backend + 36 E2E
+- 516 testes backend + 36 E2E
 
 ### Funcionalidades sandbox (prontas, aguardando provider real)
 - Cobrança Pix (QR Code simulado)
@@ -225,6 +225,7 @@ O PayFlow AI não será lançado publicamente até atingir paridade funcional pe
 - Provider factory com feature flags
 - Provider connection registry (fake/sandbox)
 - Open Finance consent (fake)
+- Open Finance read: saldo, extrato, transações, categorias (fake/demo)
 - Transaction authorization (6-digit challenge, hashed)
 - Audit logs com IP/user-agent hasheados
 - Webhook idempotency com sanitização
