@@ -13,8 +13,13 @@ build/
 .env
 .env.local
 .env.*.local
+*.env
 .venv/
 backend/.venv/
+
+# Secrets / keys
+*.pem
+*.key
 
 # Node
 node_modules/

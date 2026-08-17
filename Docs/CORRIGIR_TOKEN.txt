@@ -1,19 +1,19 @@
 CORREÇÃO DO AUTH TOKEN
 
 Token INCORRETO (atual no .env):
-c25b54573544bbc39be30e3791fbded9
+TWILIO_AUTH_TOKEN=your-twilio-auth-token-here
                    ^
                    3 (errado)
 
 Token CORRETO (da imagem do console):
-c25b54573544bbc59be30e3791fbded9
+TWILIO_AUTH_TOKEN=your-twilio-auth-token-here
                    ^
                    5 (correto)
 
 AÇÃO:
 1. Abra o arquivo .env
-2. Localize a linha: TWILIO_AUTH_TOKEN=c25b54573544bbc39be30e3791fbded9
-3. Substitua por: TWILIO_AUTH_TOKEN=c25b54573544bbc59be30e3791fbded9
+2. Localize a linha: TWILIO_AUTH_TOKEN=your-twilio-auth-token-here
+3. Substitua por: TWILIO_AUTH_TOKEN=your-twilio-auth-token-here
 4. Salve o arquivo
 5. Execute: docker-compose restart backend
 6. Aguarde 10 segundos
