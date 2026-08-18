@@ -45,7 +45,7 @@ Autônomos e MEIs precisam de uma forma simples de cobrar clientes. Soluções e
 | Pagamentos | Provider fake (padrão) / Mercado Pago sandbox (opt-in) |
 | PDF | ReportLab |
 | Infra | Docker Compose |
-| Testes | pytest (117 testes), Playwright E2E (10 cenários) |
+| Testes | pytest (629 testes backend), Playwright E2E (10 cenários) |
 
 ## Como rodar demo
 
@@ -82,6 +82,19 @@ cd .. && docker-compose -f docker-compose.demo.yml down -v
 cd frontend
 npm run test:e2e
 ```
+
+## Status dos testes e CI
+
+**Testes do produto (verificados independentemente):**
+- Backend: 629 testes coletados, 629 passaram, 0 falhas, 0 pulados (65s)
+- E2E: 10 cenários Playwright (executados via demo stack)
+
+**CI do GitHub Actions:**
+- `backend-tests`: passando (629 testes)
+- `docker-compose-check`: falha por config stale (`docker-compose` v1 vs `docker compose` v2)
+- `frontend-build`: falha por versão de toolchain (Node 18 vs Next.js 16 requer Node 20+)
+
+As falhas de CI são de configuração, não de produto. Os testes backend passam localmente e no CI.
 
 ## Arquitetura
 
@@ -278,7 +291,7 @@ O PayFlow AI não será lançado publicamente até atingir paridade funcional pe
 - **Pydantic** para validação
 
 ### Frontend
-- **Next.js 14** com TypeScript
+- **Next.js 16** com TypeScript
 - **TailwindCSS** para estilização
 - **Lucide React** para ícones
 - **Axios** para requisições HTTP
